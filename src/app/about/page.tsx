@@ -1,133 +1,235 @@
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
-    Info, Cpu, ShieldCheck, Zap, ArrowLeft, Github, Globe,
-    BookOpen, GraduationCap, User, Lightbulb, Search, Target
+    Cpu, Zap, ArrowLeft, BookOpen,
+    GraduationCap, User, Lightbulb, Search, Target,
+    Code2, Rocket, Layout, Sparkles
 } from "lucide-react";
 
+const fadeUp = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i = 1) => ({
+        opacity: 1,
+        y: 0,
+        transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" }
+    })
+};
+import { Variants } from "framer-motion";
+const containerVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number = 1) => ({
+        opacity: 1,
+        y: 0,
+        transition: {
+            delay: i * 0.1,
+            duration: 0.5,
+            ease: "easeOut", // Buradaki string hatasını "easeOut" gibi sabit bir değer yaparak çözeriz
+        },
+    }),
+};
 export default function AboutPage() {
     const router = useRouter();
 
-    const stats = [
-        { label: "Mimari", value: "Next.js 14 (App Router)", icon: <Cpu size={14} /> },
-        { label: "Dil", value: "TypeScript & Tailwind", icon: <Zap size={14} /> },
-        { label: "Amacı", value: "Eğitimin Oyunlaştırılması", icon: <Lightbulb size={14} /> },
-    ];
-
-    const missionCards = [
-        {
-            icon: <BookOpen className="text-blue-500" />,
-            title: "Öğrenme Odaklı",
-            desc: "Ders ünitelerini, terimleri ve önemli kavramları klasik ezber yönteminden çıkarıp eğlenceli bir yarışma formatına dönüştürür."
-        },
-        {
-            icon: <Target className="text-emerald-500" />,
-            title: "Kalıcı Bilgi",
-            desc: "Sorular ve jokerler aracılığıyla öğrencilerin konuları tekrar etmesini sağlar, görsel ve interaktif geri bildirimle akılda kalıcılığı artırır."
-        },
-        {
-            icon: <Search className="text-amber-500" />,
-            title: "Analitik Düşünme",
-            desc: "Süre kısıtlaması ve stratejik joker kullanımıyla öğrencinin baskı altında doğru karar verme yeteneğini geliştirir."
-        }
-    ];
-
     return (
-        <div className="min-h-screen bg-[#020617] text-white selection:bg-blue-500/30 font-sans">
-            {/* Arka Plan Glow Efektleri */}
+        <div className="min-h-screen bg-[#020617] text-slate-300 selection:bg-blue-500/30 overflow-x-hidden">
+            {/* Arka Plan Glow */}
             <div className="fixed inset-0 pointer-events-none">
-                <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full" />
-                <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] rounded-full" />
+                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-600/5 blur-[120px]" />
+                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-600/5 blur-[120px]" />
             </div>
 
-            <div className="max-w-5xl mx-auto px-6 py-20 relative z-10">
-                {/* Geri Butonu */}
-                <button
-                    onClick={() => router.back()}
-                    className="flex items-center gap-2 text-slate-500 hover:text-white transition-all mb-12 font-bold uppercase text-xs tracking-[0.2em]"
+            <div className="max-w-4xl mx-auto px-6 py-12 relative z-10">
+
+                {/* Header */}
+                <motion.header
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.6 }}
+                    className="flex justify-between items-center mb-20"
                 >
-                    <ArrowLeft size={16} /> Geri Dön
-                </button>
+                    <button
+                        onClick={() => router.back()}
+                        className="group flex items-center gap-2 text-slate-500 hover:text-blue-400 transition-all text-xs font-bold tracking-widest uppercase"
+                    >
+                        <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                        Geri Dön
+                    </button>
 
-                {/* ANA BAŞLIK BÖLÜMÜ */}
-                <div className="space-y-8 mb-20">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest">
-                        <GraduationCap size={14} /> Eğitim Teknolojileri Projesi
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-slate-500 font-bold tracking-tighter uppercase">
+                        <Sparkles size={12} className="text-blue-500 animate-pulse" />
+                        v2.0 Platform
                     </div>
-                    <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-tight italic">
-                        Bilişim <span className="text-blue-500">Arena</span> <br />
+                </motion.header>
+
+                {/* Hero */}
+                <motion.section
+                    initial="hidden"
+                    animate="visible"
+                    variants={containerVariants}
+                    className="mb-24 space-y-6"
+                >
+                    <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight uppercase italic leading-none">
+                        Bilişim <span className="text-blue-500 not-italic">Arena</span>
                     </h1>
-                    <p className="text-slate-400 max-w-3xl text-lg md:text-xl leading-relaxed font-medium italic border-l-2 border-slate-800 pl-8">
-                        "Bu platform, okul derslerindeki karmaşık üniteleri ve kelimeleri öğrencilerin zihninde
-                        kalıcı hale getirmek için tasarlanmış bir **interaktif pekiştirme aracıdır**."
+                    <p className="text-lg text-slate-400 leading-relaxed max-w-2xl font-medium">
+                        Eğitimi bir görevden çok, bir{" "}
+                        <span className="text-white underline underline-offset-4 decoration-blue-500/50">
+                            deneyime
+                        </span>{" "}
+                        dönüştürüyoruz. Karmaşık müfredat ünitelerini interaktif oyun
+                        mekanikleriyle yeniden kurguladık.
                     </p>
-                </div>
+                </motion.section>
 
-                {/* TEKNİK ÖZET KARTLARI */}
-                <div className="flex flex-wrap gap-4 mb-20">
-                    {stats.map((s, i) => (
-                        <div key={i} className="bg-slate-900/50 border border-slate-800/50 px-6 py-4 rounded-2xl flex items-center gap-4 hover:border-blue-500/30 transition-all">
-                            <div className="p-2 bg-slate-950 rounded-lg text-blue-500">{s.icon}</div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{s.label}</p>
-                                <p className="text-sm font-bold text-slate-200">{s.value}</p>
+                {/* Özellikler */}
+                <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
+                    {[
+                        { icon: <Layout size={20} />, label: "MİMARİ", val: "Next.js 14" },
+                        { icon: <Code2 size={20} />, label: "TEKNOLOJİ", val: "TypeScript" },
+                        { icon: <Rocket size={20} />, label: "ODAK", val: "Eğitim" }
+                    ].map((item, i) => (
+                        <motion.div
+                            key={i}
+                            custom={i}
+                            initial="hidden"
+                            whileInView="visible"
+                            viewport={{ once: true }}
+                            variants={containerVariants}
+                            whileHover={{ y: -4 }}
+                            className="bg-slate-900/40 border border-slate-800/60 p-6 rounded-2xl shadow-sm transition-transform"
+                        >
+                            <div className="text-blue-500 mb-4">{item.icon}</div>
+                            <div className="text-[10px] font-black text-slate-500 tracking-[0.2em] mb-1">
+                                {item.label}
                             </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* VİZYON KARTLARI */}
-                <div className="grid md:grid-cols-3 gap-8 mb-24">
-                    {missionCards.map((card, i) => (
-                        <div key={i} className="group p-10 rounded-[3rem] bg-slate-900/30 border border-slate-800/50 hover:bg-slate-900/50 hover:border-blue-500/40 transition-all duration-500">
-                            <div className="mb-6 w-14 h-14 flex items-center justify-center bg-slate-950 rounded-2xl group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">
-                                {card.icon}
+                            <div className="text-sm font-bold text-white tracking-wide uppercase">
+                                {item.val}
                             </div>
-                            <h3 className="text-xl font-black mb-4 uppercase tracking-tight italic">{card.title}</h3>
-                            <p className="text-slate-500 text-sm leading-relaxed font-medium">
-                                {card.desc}
-                            </p>
-                        </div>
+                        </motion.div>
                     ))}
-                </div>
+                </section>
+                <br />
+                {/* Neden */}
+                <div className="space-y-6 mb-24 text-sm">
+                    <h2 className="text-xs font-black text-slate-500 tracking-[0.3em] uppercase mb-8 flex items-center gap-3">
+                        <div className="h-px w-8 bg-blue-500/30" /> Neden Bilişim Arena?
+                    </h2>
 
-                {/* OKUL & GELİŞTİRİCİ BÖLÜMÜ */}
-                <div className="grid md:grid-cols-2 gap-8 mb-24">
-                    <div className="p-10 rounded-[3rem] bg-gradient-to-br from-blue-600/10 to-transparent border border-blue-500/20">
-                        <h4 className="text-xs font-black uppercase tracking-[0.3em] text-blue-400 mb-6 flex items-center gap-2">
-                            <User size={14} /> Geliştirici Bilgileri
-                        </h4>
-                        <p className="text-2xl font-black italic mb-2">Umut Can Salman</p>
-                        <p className="text-slate-400 text-sm leading-relaxed">
-                            Bilişim Teknolojileri alanına duyduğum merakı, eğitimde inovasyon yaratma amacıyla bu projeye dönüştürdüm.
-                            Frontend'den Backend mimarisine kadar tüm süreç şahsım tarafından yönetilmiştir.
-                        </p>
-                    </div>
-
-                    <div className="p-10 rounded-[3rem] bg-slate-900/40 border border-slate-800">
-                        <h4 className="text-xs font-black uppercase tracking-[0.3em] text-slate-500 mb-6 flex items-center gap-2">
-                            <GraduationCap size={14} /> Kurumsal Bilgi
-                        </h4>
-                        <p className="text-xl font-black italic mb-2">Serçev Engelsiz Mesleki Ve teknik Anadolu Lisesi</p>
-                        <p className="text-slate-500 text-sm leading-relaxed italic">
-                            Bu çalışma, okul müfredatına destekleyici bir dijital materyal olarak sunulmak üzere hazırlanmıştır.
-                            Öğretmenlerin ve öğrencilerin kullanımına açıktır.
-                        </p>
-                    </div>
-                </div>
-
-                {/* FOOTER */}
-                <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-slate-900 pt-12">
-                    <div className="flex gap-3">
-                        {["Tailwind", "NextJS", "TypeScript", "Vercel"].map(t => (
-                            <span key={t} className="text-[10px] font-bold text-slate-600 border border-slate-800/50 px-3 py-1 rounded-lg uppercase tracking-widest">{t}</span>
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {[
+                            {
+                                icon: <Target size={20} />,
+                                title: "Kalıcı Öğrenme",
+                                color: "text-blue-500 bg-blue-500/10",
+                                text:
+                                    "Klasik ezber yöntemleri yerine, soru-cevap ve anlık geri bildirimle bilginin görsel hafızada yer edinmesini sağlıyoruz."
+                            },
+                            {
+                                icon: <Search size={20} />,
+                                title: "Anlık Geri Bildirim",
+                                color: "text-emerald-500 bg-emerald-500/10",
+                                text:
+                                    "Yanlış cevaplar birer engel değil, öğrenme fırsatıdır. Sistem hatayı anında analiz eder ve doğru bilgiyi sunar."
+                            }
+                        ].map((card, i) => (
+                            <motion.div
+                                key={i}
+                                custom={i}
+                                initial="hidden"
+                                whileInView="visible"
+                                viewport={{ once: true }}
+                                variants={containerVariants}
+                                className="p-8 rounded-3xl bg-slate-900/20 border border-slate-800/50 space-y-4 hover:bg-slate-900/40 transition-colors"
+                            >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${card.color}`}>
+                                    {card.icon}
+                                </div>
+                                <h3 className="text-white font-bold uppercase tracking-tight">
+                                    {card.title}
+                                </h3>
+                                <p className="text-slate-500 leading-relaxed">
+                                    {card.text}
+                                </p>
+                            </motion.div>
                         ))}
                     </div>
-                    <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">
-                        © 2024 EDU-GAMIFICATION PROJECT
-                    </p>
                 </div>
+                <br />
+                {/* Geliştirici */}
+                <section className="flex flex-col gap-6 mb-24">
+                    <div className="grid md:grid-cols-5 gap-6">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.1, duration: 0.6 }}
+                            className="md:col-span-2 p-10 rounded-[2.5rem] bg-slate-900/40 border border-slate-800/50 flex flex-col justify-center"
+                        >
+
+                            {/* User Logosu - Pozisyon ve Boyut Ayarı Yapıldı */}
+                            <User
+                                className="text-slate-600 mb-6" size={24}
+                            />
+
+                            {/* İçerik - z-10 ile logonun üstüne çıkarıldı */}
+                            <div className="relative z-10">
+
+                                <div className="text-3xl font-black text-white uppercase italic tracking-tighter mb-4 leading-none">
+                                    Umut Can Salman
+                                </div>
+                                <p className="text-slate-400 leading-relaxed max-w-[280px] text-sm font-medium">
+                                    Bilişim Teknolojileri merakını modern yazılım standartlarıyla
+                                    birleştirerek bu platformu inşa etti.
+                                </p>
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.1, duration: 0.6 }}
+                            className="md:col-span-2 p-10 rounded-[2.5rem] bg-slate-900/40 border border-slate-800/50 flex flex-col justify-center"
+                        >
+                            <GraduationCap className="text-slate-600 mb-6" size={24} />
+                            <div className="text-sm font-bold text-slate-200 uppercase leading-snug mb-2">
+                                Serçev Engelsiz Mesleki ve Teknik Anadolu Lisesi
+                            </div>
+                            <p className="text-xs text-slate-500 italic">
+                                Resmi eğitim materyali projesi.
+                            </p>
+                        </motion.div>
+                    </div>
+                </section>
+                <br />
+                {/* Footer */}
+                <footer className="pt-12 border-t border-slate-900/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black text-slate-600 tracking-[0.4em] uppercase">
+                            © 2025 - 2026 EDU-GAMIFICATION
+                        </p>
+                        <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
+                            Eğitim, ezber değil. Deneyimdir.
+                            Bu platform <span className="text-slate-300 font-semibold">Umut Can Salman</span> tarafından
+                            oyunlaştırılmış öğrenme vizyonuyla geliştirildi.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <div className="flex gap-3">
+                            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                            <div className="h-1.5 w-1.5 rounded-full bg-slate-700" />
+                            <div className="h-1.5 w-1.5 rounded-full bg-slate-800" />
+                        </div>
+                        <span className="text-[10px] text-slate-600 font-bold tracking-widest uppercase">
+                            Built with focus
+                        </span>
+                    </div>
+                </footer>
+
+
             </div>
         </div>
     );

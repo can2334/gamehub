@@ -91,8 +91,6 @@ wrangler dev
 ```
 app/            # Next.js App Router
 components/     # UI bileşenleri
-lib/            # Yardımcı fonksiyonlar
-styles/         # Global stiller
 public/         # Statik dosyalar
 ```
 

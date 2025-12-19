@@ -19,16 +19,10 @@ export default function Navbar() {
             {/* MENÜ LİNKLERİ */}
             <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
                 <Link
-                    href="/kutuphane"
+                    href="/games"
                     className="hover:text-white transition-colors underline-offset-4 hover:underline"
                 >
                     Kütüphane
-                </Link>
-                <Link
-                    href="/siralama"
-                    className="hover:text-white transition-colors underline-offset-4 hover:underline"
-                >
-                    Sıralama
                 </Link>
                 <Link
                     href="/admin"

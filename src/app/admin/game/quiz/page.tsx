@@ -14,7 +14,7 @@ export default function SubjectSelection() {
 
     return (
         <div className="min-h-screen bg-[#020617] text-white p-10">
-            <button onClick={() => router.push("/admin")} className="flex items-center gap-2 text-slate-500 mb-10 font-bold uppercase text-xs">
+            <button onClick={() => router.push("/admin/dashboard")} className="flex items-center gap-2 text-slate-500 mb-10 font-bold uppercase text-xs">
                 <ArrowLeft size={16} /> OYUNLARA DÖN
             </button>
 

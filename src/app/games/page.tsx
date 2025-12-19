@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Gamepad2, Search, Filter, Rocket, Star, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Gamepad2, Search, Rocket, Star, Loader2, LayoutGrid, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 interface Game {
@@ -15,13 +16,13 @@ export default function GamesLibrary() {
     const [games, setGames] = useState<Game[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("Hepsi");
 
     useEffect(() => {
         const fetchGames = async () => {
             try {
                 const res = await fetch("https://gamebackend.cansalman332.workers.dev/api/games");
                 const data = await res.json();
-                // Sadece aktif olanları listele
                 setGames(data.filter((g: Game) => g.isActive));
             } catch (err) {
                 console.error("Oyunlar yüklenemedi.");
@@ -32,10 +33,15 @@ export default function GamesLibrary() {
         fetchGames();
     }, []);
 
-    // Arama filtresi
-    const filteredGames = games.filter(game =>
-        game.title.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Benzersiz kategorileri çek (Filtre butonları için)
+    const categories = ["Hepsi", ...Array.from(new Set(games.map(g => g.category)))];
+
+    // Hem arama hem kategori filtresi
+    const filteredGames = games.filter(game => {
+        const matchesSearch = game.title.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategory === "Hepsi" || game.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
 
     if (loading) {
         return (
@@ -46,88 +52,149 @@ export default function GamesLibrary() {
     }
 
     return (
-        <div className="min-h-screen bg-[#020617] text-white selection:bg-emerald-500/30">
-            {/* HERO / HEADER */}
-            <div className="relative border-b border-slate-800 bg-slate-900/20 px-8 py-16">
-                <div className="max-w-6xl mx-auto relative z-10">
-                    <div className="flex items-center gap-3 text-emerald-500 font-mono text-sm mb-4 uppercase tracking-[0.3em]">
-                        <Gamepad2 size={20} /> Görev Merkezi
-                    </div>
-                    <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter mb-6">
-                        TÜM <span className="text-emerald-500 text-shadow-glow">OYUNLAR</span>
-                    </h1>
-                    <p className="text-slate-400 max-w-xl text-lg leading-relaxed">
-                        Bilişim yeteneklerini geliştirmek için tasarlanmış interaktif senaryoları keşfet.
-                    </p>
-                </div>
-                {/* Arka plan süsü */}
-                <div className="absolute right-0 top-0 w-1/3 h-full bg-emerald-500/5 blur-[120px] rounded-full" />
+        <div className="min-h-screen bg-[#020617] text-slate-300 selection:bg-emerald-500/30 overflow-x-hidden">
+            {/* Arka Plan Glow */}
+            <div className="fixed inset-0 pointer-events-none">
+                <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/5 blur-[120px] rounded-full" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full" />
             </div>
 
-            {/* FİLTRE VE ARAMA BARO */}
-            <div className="sticky top-0 z-40 bg-[#020617]/80 backdrop-blur-xl border-b border-slate-800/50 px-8 py-4">
-                <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 justify-between">
-                    <div className="relative flex-1 max-w-md">
+            <div className="max-w-6xl mx-auto px-6 py-16 relative z-10">
+
+                {/* Üst Başlık Alanı */}
+                <header className="mb-20">
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-2 text-emerald-500 font-black text-[10px] mb-6 uppercase tracking-[0.4em]"
+                    >
+                        <Gamepad2 size={14} /> Mission Control
+                    </motion.div>
+
+                    <motion.h1
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="text-5xl md:text-7xl font-black italic tracking-tighter text-white uppercase leading-none mb-8"
+                    >
+                        OYUN <span className="text-emerald-500 not-italic">KÜTÜPHANESİ</span>
+                    </motion.h1>
+
+                    <motion.p
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="max-w-xl text-lg text-slate-400 font-medium leading-relaxed border-l-2 border-emerald-500/20 pl-6"
+                    >
+                        Ders içeriklerini eğlenceli görevlere dönüştürdük.
+                        Kategorini seç ve maceraya başla.
+                    </motion.p>
+                </header>
+
+                {/* Filtreleme ve Arama Barı */}
+                <section className="mb-16 space-y-8">
+                    {/* Arama */}
+                    <div className="relative max-w-md">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                         <input
                             type="text"
-                            placeholder="Oyun ara..."
-                            className="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-emerald-500/50 transition-all text-sm"
+                            placeholder="Görev ara..."
+                            className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-emerald-500/40 transition-all text-sm backdrop-blur-md"
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <button className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-5 py-3 rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all">
-                            <Filter size={16} /> Kategoriler
-                        </button>
+
+                    {/* Kategori Hapları */}
+                    <div className="flex flex-wrap gap-3">
+                        {categories.map((cat) => (
+                            <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${selectedCategory === cat
+                                    ? "bg-emerald-500 border-emerald-500 text-[#020617] shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                                    : "bg-slate-900/50 border-slate-800 text-slate-500 hover:border-slate-700"
+                                    }`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
                     </div>
-                </div>
-            </div>
+                </section>
 
-            {/* OYUN KARTLARI GRİDİ */}
-            <main className="max-w-6xl mx-auto p-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredGames.map((game) => (
-                        <Link
-                            key={game.id}
-                            href={`/${game.slug}`}
-                            className="group relative bg-slate-900/50 border border-slate-800 rounded-[2.5rem] overflow-hidden hover:border-emerald-500/50 transition-all hover:-translate-y-2 shadow-xl"
-                        >
-                            <div className="aspect-[16/10] bg-slate-800 flex items-center justify-center relative overflow-hidden">
-                                {/* Oyun İkonu/Görseli Alanı */}
-                                <Rocket size={48} className="text-slate-700 group-hover:text-emerald-500 group-hover:scale-125 transition-all duration-500" />
-                                <div className="absolute top-4 right-4 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/5 flex items-center gap-1">
-                                    <Star size={12} className="text-yellow-500 fill-yellow-500" />
-                                    <span className="text-[10px] font-bold">4.8</span>
-                                </div>
-                            </div>
+                {/* Oyun Grid */}
+                <motion.main
+                    layout
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+                >
+                    <AnimatePresence mode="popLayout">
+                        {filteredGames.map((game, index) => (
+                            <motion.div
+                                layout
+                                key={game.id}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                transition={{ delay: index * 0.05 }}
+                            >
+                                <Link
+                                    href={`/${game.slug}`}
+                                    className="group block relative bg-slate-900/30 border border-slate-800/60 rounded-[2rem] overflow-hidden hover:border-emerald-500/40 transition-all duration-500"
+                                >
+                                    {/* Görsel Alanı */}
+                                    <div className="aspect-[16/9] bg-slate-950 flex items-center justify-center relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent opacity-60" />
+                                        <Rocket size={40} className="text-slate-800 group-hover:text-emerald-500 group-hover:scale-110 transition-all duration-700" />
 
-                            <div className="p-8">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className="text-[10px] font-black bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-lg uppercase tracking-widest border border-emerald-500/20">
-                                        {game.category}
-                                    </span>
-                                </div>
-                                <h3 className="text-2xl font-black mb-2 group-hover:text-emerald-400 transition-colors uppercase italic italic">
-                                    {game.title}
-                                </h3>
-                                <p className="text-slate-500 text-sm line-clamp-2 font-medium">
-                                    Bu görevde {game.category.toLowerCase()} yeteneklerini test edeceksin. Başlamak için tıkla!
-                                </p>
-                            </div>
+                                        <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/5 flex items-center gap-1">
+                                            <Star size={10} className="text-yellow-500 fill-yellow-500" />
+                                            <span className="text-[9px] font-bold text-white">4.8</span>
+                                        </div>
+                                    </div>
 
-                            {/* Hover Alt Çizgisi */}
-                            <div className="absolute bottom-0 left-0 h-1 bg-emerald-500 w-0 group-hover:w-full transition-all duration-500" />
-                        </Link>
-                    ))}
-                </div>
+                                    {/* İçerik Alanı */}
+                                    <div className="p-8">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest px-2 py-1 bg-emerald-500/5 border border-emerald-500/10 rounded">
+                                                {game.category}
+                                            </span>
+                                            <LayoutGrid size={14} className="text-slate-700" />
+                                        </div>
 
+                                        <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-400 transition-colors uppercase tracking-tight">
+                                            {game.title}
+                                        </h3>
+
+                                        <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-6 font-medium">
+                                            {game.category} dünyasında seviye atlamak için bu görevi tamamla.
+                                        </p>
+
+                                        <div className="flex items-center gap-2 text-[10px] font-black text-white uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">
+                                            Görevi Başlat <ChevronRight size={14} className="text-emerald-500" />
+                                        </div>
+                                    </div>
+
+                                    {/* Kart Altı Glow Çizgisi */}
+                                    <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-emerald-500 group-hover:w-full transition-all duration-700 shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
+                                </Link>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </motion.main>
+
+                {/* Boş Durum */}
                 {filteredGames.length === 0 && (
-                    <div className="text-center py-40">
-                        <p className="text-slate-500 font-mono uppercase tracking-widest">Aranan kriterde oyun bulunamadı.</p>
-                    </div>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-center py-32 border-2 border-dashed border-slate-900 rounded-[3rem]"
+                    >
+                        <div className="bg-slate-900 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Search className="text-slate-700" />
+                        </div>
+                        <p className="text-slate-500 font-black uppercase text-xs tracking-[0.3em]">Aranan kriterde görev bulunamadı.</p>
+                    </motion.div>
                 )}
-            </main>
+            </div>
         </div>
     );
 }
