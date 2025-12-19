@@ -80,7 +80,10 @@ Projeyi yerel makinenizde çalıştırmak için aşağıdaki adımları takip ed
    ```bash
    git clone https://github.com/can2334/gamehub.git   
 
-      ```bash
-cd gamehub
-      ```bash
-npm install
+   2. **Projeyi klonlayın:**
+   ```bash
+   git clone https://github.com/can2334/gamehub.git   
+
+   3. **Projeyi klonlayın:**
+   ```bash
+   git clone https://github.com/can2334/gamehub.git   
