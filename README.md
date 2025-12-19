@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎓 Dijital Öğrenme Laboratuvarı: Eğitimde Oyunlaştırma
 
-## Getting Started
+![Next.js](https://img.shields.io/badge/Next.js-14-blue?style=for-the-badge&logo=nextdotjs)
+![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?style=for-the-badge&logo=typescript)
+![TailwindCSS](https://img.shields.io/badge/Tailwind-Styled-38B2AC?style=for-the-badge&logo=tailwind-css)
+![Edge Computing](https://img.shields.io/badge/Cloudflare-Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)
 
-First, run the development server:
+Bu proje, geleneksel eğitim metotlarını modern **oyunlaştırma (gamification)** teknikleriyle birleştirerek, öğrencilerin ders ünitelerini, terimleri ve kavramları kalıcı bir şekilde öğrenmesini sağlayan interaktif bir web platformudur.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🎯 Projenin Amacı ve Vizyonu
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Klasik ezberci eğitim anlayışının dışına çıkarak; Bilişim Teknolojileri, Fizik ve diğer teknik derslerdeki ünitelerin "akılda kalıcı" olmasını hedefliyoruz. Öğrenci, bir bilgi yarışması atmosferinde soruları yanıtlarken aslında o ünitenin tekrarını yapmış olur.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Dinamik Öğrenme:** Sorular üzerinden konuları pekiştirme.
+- **Motivasyon:** Puan ve seviye sistemiyle öğrenciyi teşvik etme.
+- **Dijital Dönüşüm:** Kağıt üzerindeki testleri modern, dijital ve eğlenceli bir deneyime dönüştürme.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🚀 Öne Çıkan Özellikler
 
-## Learn More
+- **Dinamik Kategori Sistemi:** URL parametreleri ile tek platform üzerinden farklı ders ünitelerine (Fizik, Bilişim vb.) erişim.
+- **Eğitsel Joker Mekanikleri:** 50/50, Seyirci ve Soru Paslama gibi stratejik araçlar.
+- **Zaman Yönetimi:** Her soru için 30 saniyelik süre ile hızlı düşünme becerisi.
+- **Modern UI/UX:** Karanlık mod odaklı, göz yormayan ve teknoloji temalı şık arayüz.
+- **Responsive Tasarım:** Akıllı tahta, tablet ve telefonlarla tam uyumlu.
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠️ Teknik Yığın (Tech Stack)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Katman | Teknoloji | Açıklama |
+| :--- | :--- | :--- |
+| **Frontend** | `Next.js 14` | App Router mimarisi ile yüksek performanslı istemci yönetimi. |
+| **Dil** | `TypeScript` | Tip güvenli kod yapısı ile hatasız geliştirme. |
+| **Stil** | `Tailwind CSS` | Modern ve hızlı arayüz tasarımı. |
+| **Backend** | `Cloudflare Workers` | Edge mimarisi ile düşük gecikmeli API hizmeti. |
+| **İkonlar** | `Lucide React` | Minimalist ve açıklayıcı görsel dil. |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🏗️ Kurulum ve Çalıştırma
 
-## Deploy on Vercel
+Projeyi yerel makinenizde çalıştırmak için:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Projeyi klonlayın:
+   ```bash
+   git clone [https://github.com/can2334/gamehub.git](https://github.com/can2334/gamehub.git)
