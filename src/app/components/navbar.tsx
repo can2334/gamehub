@@ -7,8 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function Header() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [mobileEgitimOpen, setMobileEgitimOpen] = useState(false);
-    const [egitimOpen, setEgitimOpen] = useState(false);
 
     // PC'ye geçince sidebar'ı otomatik kapatma (GÜVENLİK KİLİDİ)
     useEffect(() => {
@@ -24,7 +22,6 @@ export default function Header() {
     const menuItems = [
         { label: "Anasayfa", href: "/" },
         { label: "Kütüphane", href: "/games" },
-        { label: "İletişim", href: "/contact" },
     ];
 
     return (
