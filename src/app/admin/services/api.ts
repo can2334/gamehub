@@ -1,4 +1,5 @@
-// BASE_URL sonundaki /api kalsın
+// services/api.ts
+
 const BASE_URL = "https://gamebackend.cansalman332.workers.dev/api";
 
 export interface TeamStatus {
@@ -9,13 +10,12 @@ export interface TeamStatus {
 }
 
 export interface Question {
-    id: number;
+    id?: number;
     question: string;
-    // DÜZELTME: options hem obje hem string (JSON metni) olabilir dedik
     options: any;
     correctAnswer: string;
-    level?: string;
     word?: string;
+    sure?: number;
 }
 
 export interface GameStatusResponse {
@@ -26,13 +26,11 @@ export interface GameStatusResponse {
 }
 
 export const gameApi = {
-    // 1. KOD ÜRETME
     generateCode: async () => {
         const res = await fetch(`${BASE_URL}/generate-code`);
         return (await res.json()) as { code: string };
     },
 
-    // 2. OTURUM BAŞLATMA
     startSession: async (groupCode: string, category: string) => {
         return fetch(`${BASE_URL}/session/start`, {
             method: 'POST',
@@ -41,41 +39,6 @@ export const gameApi = {
         });
     },
 
-    // api.ts dosyasındaki getSessionStatus kısmını bununla değiştir
-    getSessionStatus: async (code: string): Promise<GameStatusResponse> => {
-        const res = await fetch(`${BASE_URL}/session/status?code=${code}`);
-        if (!res.ok) throw new Error("Oda Bulunamadı");
-
-        const data = await res.json();
-
-        // EĞER ŞIKLAR STRING OLARAK GELİRSE OBJE YAP (BÜYÜK İHTİMALLE SORUN BURADA)
-        if (data.currentQuestion && typeof data.currentQuestion.options === 'string') {
-            try {
-                data.currentQuestion.options = JSON.parse(data.currentQuestion.options);
-            } catch (e) {
-                console.error("Şıklar çözülemedi:", e);
-            }
-        }
-        return data;
-    },
-    // 4. CEVAPLARI SIFIRLAMA
-    resetAnswers: async (code: string) => {
-        return fetch(`${BASE_URL}/session/reset?code=${code}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-    },
-
-    // 5. OYUNU BİTİRME
-    finishSession: async (groupCode: string) => {
-        return fetch(`${BASE_URL}/session/finish`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ groupCode }),
-        });
-    },
-
-    // 6. ODAYA KATILMA
     joinSession: async (groupCode: string, teamName: string) => {
         return fetch(`${BASE_URL}/session/join`, {
             method: 'POST',
@@ -84,14 +47,67 @@ export const gameApi = {
         });
     },
 
-    // 7. CEVAP GÖNDERME
-    async submitAnswer(groupCode: string, teamName: string, answer: string, isCorrect: boolean) {
+    getSessionStatus: async (code: string): Promise<GameStatusResponse> => {
+        const res = await fetch(`${BASE_URL}/session/status?code=${code}`);
+        if (!res.ok) throw new Error("Oda Bulunamadı");
+        const data = await res.json();
+
+        const teams = (data.teams || []).map((t: any) => ({
+            teamName: t.teamName,
+            selectedAnswer: t.selectedAnswer || null,
+            isCorrect: Number(t.isCorrect) || 0,
+            score: Number(t.score) || 0
+        }));
+
+        if (data.currentQuestion && typeof data.currentQuestion.options === 'string') {
+            try {
+                data.currentQuestion.options = JSON.parse(data.currentQuestion.options);
+            } catch (e) {
+                console.error("Options parse error");
+            }
+        }
+
+        return {
+            teams,
+            currentQuestion: data.currentQuestion,
+            currentQuestionIndex: data.currentQuestionIndex,
+            status: data.status
+        };
+    },
+
+    resetAnswers: async (code: string) => {
+        return fetch(`${BASE_URL}/session/reset?code=${code}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+    },
+
+    finishSession: async (groupCode: string) => {
+        return fetch(`${BASE_URL}/session/finish?code=${groupCode}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+    },
+
+    // 1. BU MEVCUT FONKSİYON: Sadece şıkkı günceller (Admin panelinde görmek için)
+    // Öğrenci her tıkladığında bu çalışsın ama sunucu tarafında puan eklemesin 
+    // (Sunucu kodunda isCorrect true ise her seferinde puan veriyorsa, isCorrect'i 0 göndeririz)
+    submitAnswer: async (groupCode: string, teamName: string, answer: string) => {
         const res = await fetch(`${BASE_URL}/session/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ groupCode, teamName, answer, isCorrect }),
+            body: JSON.stringify({ groupCode, teamName, answer, isCorrect: false }), // Puan vermez, sadece şıkkı gösterir
         });
-        if (!res.ok) throw new Error("Cevap iletilemedi");
         return res.json();
     },
+
+    // 2. YENİ FONKSİYON: Sadece süre bittiğinde çalışır ve puanı verir
+    submitFinalScore: async (groupCode: string, teamName: string, answer: string, isCorrect: boolean) => {
+        const res = await fetch(`${BASE_URL}/session/submit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ groupCode, teamName, answer, isCorrect }), // Gerçek sonucu ve puanı gönderir
+        });
+        return res.json();
+    }
 };

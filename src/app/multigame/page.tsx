@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { gameApi } from '../admin/services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { gameApi, TeamStatus } from '../admin/services/api';
+import toast, { Toaster } from 'react-hot-toast';
 
 const ANSWERS = ['A', 'B', 'C', 'D'];
 
@@ -12,8 +13,10 @@ export default function StudentGamepad() {
     const [selected, setSelected] = useState<string | null>(null);
     const [currentQuestion, setCurrentQuestion] = useState<any>(null);
     const [gameStatus, setGameStatus] = useState<string>("active");
-    const [allTeams, setAllTeams] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [allTeams, setAllTeams] = useState<TeamStatus[]>([]);
+    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+    const hasSubmittedFinal = useRef(false);
 
     useEffect(() => {
         const savedCode = localStorage.getItem("student_groupCode");
@@ -25,6 +28,31 @@ export default function StudentGamepad() {
         }
     }, []);
 
+    // --- SÜRE VE PUANLAMA MANTIĞI ---
+    useEffect(() => {
+        if (timeLeft === null) return;
+
+        if (timeLeft === 0) {
+            if (selected && currentQuestion && !hasSubmittedFinal.current) {
+                const isCorrect = String(selected) === String(currentQuestion.correctAnswer);
+                gameApi.submitFinalScore(groupCode, teamName, selected, isCorrect)
+                    .then(() => {
+                        hasSubmittedFinal.current = true;
+                        if (isCorrect) toast.success("Doğru! Puan eklendi.");
+                        else toast.error("Yanlış cevap!");
+                    });
+            }
+            return;
+        }
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => (prev !== null && prev > 0) ? prev - 1 : 0);
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [timeLeft, selected, currentQuestion, groupCode, teamName]);
+
+    // Polling (Canlı Veri Takibi)
     useEffect(() => {
         if (!joined || !groupCode) return;
 
@@ -33,253 +61,160 @@ export default function StudentGamepad() {
                 const data = await gameApi.getSessionStatus(groupCode);
                 if (!data) return;
 
-                if (data.status === "finished") {
-                    setGameStatus("finished");
-                    setAllTeams(data.teams || []);
-                } else {
-                    setGameStatus("active");
-                }
+                setGameStatus(data.status || "active");
+                if (data.teams) setAllTeams(data.teams);
 
-                const myTeam = data.teams?.find((t: any) => t.teamName === teamName);
                 if (data.currentQuestion) {
-                    setCurrentQuestion(data.currentQuestion);
-                } else {
-                    setCurrentQuestion(null);
-                }
-
-                if (!myTeam || myTeam.selectedAnswer === null) {
-                    setSelected(null);
-                } else {
-                    setSelected(myTeam.selectedAnswer);
+                    if (!currentQuestion || currentQuestion.question !== data.currentQuestion.question) {
+                        setCurrentQuestion(data.currentQuestion);
+                        setSelected(null);
+                        setTimeLeft(data.currentQuestion.sure || 30);
+                        hasSubmittedFinal.current = false;
+                    }
                 }
             } catch (err) {
-                console.error("Senkronizasyon hatası:", err);
+                console.error("Senkronizasyon hatası");
             }
         }, 1500);
 
         return () => clearInterval(interval);
-    }, [joined, groupCode, teamName]);
+    }, [joined, groupCode, currentQuestion]);
+
+    const handleSelectOption = async (answerHarf: string) => {
+        if (!currentQuestion || (timeLeft !== null && timeLeft <= 0)) return;
+        setSelected(answerHarf);
+        try {
+            await gameApi.submitAnswer(groupCode, teamName, answerHarf);
+        } catch (err) {
+            console.error("Seçim güncellenemedi");
+        }
+    };
 
     const handleJoin = async () => {
         if (!groupCode || !teamName) return;
-        setLoading(true);
         try {
             const res = await gameApi.joinSession(groupCode, teamName);
             if (res.ok) {
                 localStorage.setItem("student_groupCode", groupCode);
                 localStorage.setItem("student_teamName", teamName);
                 setJoined(true);
-            } else {
-                alert("Odaya bağlanılamadı. Kod hatalı olabilir.");
             }
-        } catch (err) {
-            alert("Bağlantı kesildi.");
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) { toast.error("Bağlantı hatası!"); }
     };
 
-    const handleSendAnswer = async (answerHarf: string) => {
-        if (selected || !currentQuestion) return;
+    const handleExitAndReset = () => { localStorage.clear(); window.location.reload(); };
 
-        const selectedIndex = ANSWERS.indexOf(answerHarf);
-        const dbCorrectIndex = Number(currentQuestion.correctAnswer);
-        const isCorrect = selectedIndex === dbCorrectIndex;
-
-        setSelected(answerHarf);
-        try {
-            await gameApi.submitAnswer(groupCode, teamName, answerHarf, isCorrect);
-        } catch (err) {
-            setSelected(null);
-            alert("Cevap gönderilemedi!");
-        }
-    };
-
-    const handleExitAndReset = () => {
-        localStorage.clear();
-        window.location.reload();
-    };
-
-    // --- RENDER: OYUN BİTTİ (SCOREBOARD) ---
+    // --- OYUN BİTTİ EKRANI (YENİ EKLENEN KISIM) ---
     if (gameStatus === "finished") {
-        const sortedTeams = [...allTeams].sort((a, b) => (b.score || 0) - (a.score || 0));
+        const sortedTeams = [...allTeams].sort((a, b) => b.score - a.score);
         return (
-            <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-white overflow-hidden">
-                <div className="absolute top-[-20%] w-full h-[50%] bg-indigo-600/20 blur-[120px] rounded-full"></div>
-
-                <div className="w-full max-w-md z-10 space-y-8 animate-in zoom-in duration-500">
-                    <div className="text-center">
-                        <div className="text-8xl mb-4 drop-shadow-[0_0_20px_rgba(99,102,241,0.5)]">🏆</div>
-                        <h2 className="text-4xl font-black italic tracking-tighter uppercase">ARENA SONU</h2>
-                    </div>
-
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-6 space-y-3 shadow-2xl">
-                        {sortedTeams.map((team, idx) => (
-                            <div key={idx} className={`flex justify-between items-center p-4 rounded-2xl border-2 transition-all ${idx === 0 ? 'bg-indigo-600/20 border-indigo-500 scale-105' : 'bg-slate-950/50 border-slate-800'}`}>
-                                <div className="flex items-center gap-4">
-                                    <span className={`text-xl font-black ${idx === 0 ? 'text-indigo-400' : 'text-slate-600'}`}>#{idx + 1}</span>
-                                    <span className="font-bold">{team.teamName}</span>
-                                </div>
-                                <span className="font-mono font-black text-xl text-indigo-400">{team.score || 0}</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    <button onClick={handleExitAndReset} className="w-full bg-white text-black p-6 rounded-[2rem] font-black text-lg hover:bg-indigo-500 hover:text-white transition-all active:scale-95 shadow-xl">
-                        YENİ MACERA
-                    </button>
+            <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-white text-center">
+                <Toaster position="top-center" />
+                <div className="mb-8">
+                    <span className="text-6xl animate-bounce inline-block">🏆</span>
+                    <h2 className="text-4xl font-black italic mt-4 text-indigo-400">ARENA TAMAMLANDI</h2>
                 </div>
-            </div>
-        );
-    }
 
-    // --- RENDER: GİRİŞ EKRANI ---
-    if (!joined) {
-        return (
-            <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-white font-sans">
-                <div className="w-full max-w-sm space-y-8 bg-slate-900/60 backdrop-blur-2xl p-10 rounded-[3rem] border border-white/5 shadow-2xl relative">
-                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-20 h-20 bg-indigo-600 rounded-3xl rotate-12 flex items-center justify-center shadow-2xl shadow-indigo-600/50">
-                        <span className="text-4xl -rotate-12">🎮</span>
-                    </div>
-
-                    <div className="text-center pt-8">
-                        <h2 className="text-2xl font-black uppercase tracking-[0.2em] text-indigo-400">Giriş Yap</h2>
-                        <p className="text-slate-500 text-xs mt-1 font-bold">Takımını seç ve arenaya katıl!</p>
-                    </div>
-
-                    <div className="space-y-4">
-                        <input
-                            type="text"
-                            placeholder="ODA KODU"
-                            value={groupCode}
-                            className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl outline-none text-center text-2xl font-mono focus:border-indigo-500 transition-all uppercase tracking-widest placeholder:opacity-20"
-                            onChange={(e) => setGroupCode(e.target.value.toUpperCase())}
-                        />
-                        <select
-                            className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl outline-none text-white font-bold appearance-none text-center"
-                            value={teamName}
-                            onChange={(e) => setTeamName(e.target.value)}
+                <div className="w-full max-w-md space-y-3 bg-slate-900/50 p-6 rounded-[2.5rem] border border-white/10 shadow-2xl">
+                    {sortedTeams.length > 0 ? sortedTeams.map((team, idx) => (
+                        <div
+                            key={idx}
+                            className={`flex justify-between items-center p-4 rounded-2xl border transition-all ${team.teamName === teamName
+                                ? 'border-indigo-500 bg-indigo-500/20 scale-105'
+                                : 'border-slate-800 bg-black/20'
+                                }`}
                         >
-                            <option value="">TAKIM SEÇİN</option>
-                            <option value="Kırmızı">🔴 KIRMIZI TAKIM</option>
-                            <option value="Mavi">🔵 MAVİ TAKIM</option>
-                            <option value="Sarı">🟡 SARI TAKIM</option>
-                            <option value="Yeşil">🟢 YEŞİL TAKIM</option>
-                        </select>
-                    </div>
-
-                    <button
-                        onClick={handleJoin}
-                        disabled={loading || !groupCode || !teamName}
-                        className="w-full bg-indigo-600 hover:bg-indigo-500 py-5 rounded-2xl font-black text-lg transition-all active:scale-95 shadow-xl shadow-indigo-600/30 disabled:opacity-50"
-                    >
-                        {loading ? "BAĞLANILIYOR..." : "ARENAYA GİR"}
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    // --- RENDER: ANA GAMEPAD ---
-    return (
-        <div className="min-h-screen bg-[#020617] p-4 flex flex-col font-sans text-white select-none">
-            {/* Header Info */}
-            <div className="flex items-center justify-between mb-6 bg-slate-900/50 p-4 rounded-3xl border border-white/5 backdrop-blur-md">
-                <button onClick={handleExitAndReset} className="w-10 h-10 flex items-center justify-center bg-slate-950 rounded-xl text-slate-500 hover:text-red-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <div className="text-center">
-                    <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">AKTİF OTURUM</div>
-                    <div className="text-sm font-bold opacity-80">{teamName} TAKIMI</div>
-                </div>
-                <div className="w-10 h-10 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></div>
-                </div>
-            </div>
-
-            {/* Soru Gösterge Alanı */}
-            <div className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full gap-6">
-                <div className={`w-full p-8 rounded-[3rem] border-2 transition-all duration-500 text-center relative overflow-hidden
-                    ${currentQuestion ? 'bg-slate-900 border-indigo-500/50 shadow-2xl' : 'bg-slate-950 border-slate-800 opacity-50'}`}>
-
-                    {currentQuestion ? (
-                        <div className="animate-in fade-in zoom-in duration-300">
-                            <span className="text-[10px] font-black bg-indigo-600 px-3 py-1 rounded-full mb-4 inline-block">SORU CANLI</span>
-                            <h3 className="text-xl md:text-2xl font-bold leading-tight">
-                                {currentQuestion.question || currentQuestion.word}
-                            </h3>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="flex justify-center gap-2">
-                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-lg font-black opacity-30">#{idx + 1}</span>
+                                <span className="font-bold uppercase">{team.teamName}</span>
+                                {team.teamName === teamName && <span className="text-[10px] bg-indigo-500 px-2 py-0.5 rounded-full font-black">SİZ</span>}
                             </div>
-                            <p className="text-slate-500 font-bold italic">Sıradaki soru hazırlanıyor...</p>
+                            <span className="font-mono font-black text-indigo-400">{team.score} PT</span>
                         </div>
+                    )) : (
+                        <p className="text-slate-500 italic">Skorlar yükleniyor...</p>
                     )}
                 </div>
 
-                {/* Butonlar Gridi */}
-                <div className="grid grid-cols-2 gap-4 w-full h-[320px]">
-                    {ANSWERS.map((ans, index) => {
-                        const opt = currentQuestion?.options;
-                        let optionText = "...";
+                <button
+                    onClick={handleExitAndReset}
+                    className="mt-8 w-full max-w-xs bg-white text-black p-5 rounded-2xl font-black text-lg hover:bg-indigo-500 hover:text-white transition-all"
+                >
+                    YENİ TURNUVA
+                </button>
+            </div>
+        );
+    }
 
-                        if (opt) {
-                            if (Array.isArray(opt)) optionText = opt[index];
-                            else if (typeof opt === 'object') optionText = opt[ans] || opt[ans.toLowerCase()];
-                        }
+    // --- GİRİŞ EKRANI ---
+    if (!joined) return (
+        <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-white">
+            <div className="bg-slate-900 p-8 rounded-3xl w-full max-w-sm space-y-4 shadow-2xl border border-white/5">
+                <h2 className="text-center font-black text-indigo-500 tracking-widest italic">ARENA GAMEPAD</h2>
+                <input type="text" placeholder="ODA KODU" className="w-full p-4 bg-black rounded-xl text-center font-mono text-2xl" onChange={(e) => setGroupCode(e.target.value.toUpperCase())} />
+                <select className="w-full p-4 bg-black rounded-xl font-bold" onChange={(e) => setTeamName(e.target.value)}>
+                    <option value="">TAKIM SEÇ</option>
+                    <option value="Kırmızı">🔴 KIRMIZI</option>
+                    <option value="Mavi">🔵 MAVİ</option>
+                    <option value="Sarı">🟡 SARI</option>
+                    <option value="Yeşil">🟢 YEŞİL</option>
+                </select>
+                <button onClick={handleJoin} className="w-full bg-indigo-600 p-4 rounded-xl font-black text-lg active:scale-95 transition-transform">KATIL</button>
+            </div>
+        </div>
+    );
 
-                        const isSelected = selected === ans;
-                        const isSomethingSelected = selected !== null;
+    // --- OYUN EKRANI ---
+    return (
+        <div className="min-h-screen bg-[#020617] p-4 text-white flex flex-col items-center">
+            <Toaster position="top-center" />
 
-                        return (
-                            <button
-                                key={ans}
-                                onClick={() => handleSendAnswer(ans)}
-                                disabled={isSomethingSelected || !currentQuestion}
-                                className={`relative group rounded-[2.5rem] border-b-8 transition-all active:border-b-0 active:translate-y-1 overflow-hidden
-                                    ${isSelected ? 'bg-indigo-600 border-indigo-800 scale-95 shadow-inner' :
-                                        !isSomethingSelected && currentQuestion ? 'bg-slate-800 border-slate-950 hover:bg-slate-700' :
-                                            'bg-slate-900 border-slate-950 opacity-40'}`}
-                            >
-                                <div className="p-4 flex flex-col items-center justify-center gap-2 h-full">
-                                    <span className={`text-4xl font-black ${isSelected ? 'text-white' : 'text-indigo-500'}`}>
-                                        {ans}
-                                    </span>
-                                    {currentQuestion && (
-                                        <span className={`text-[10px] font-bold uppercase truncate w-full px-2 ${isSelected ? 'text-indigo-200' : 'text-slate-500'}`}>
-                                            {optionText}
-                                        </span>
-                                    )}
-                                </div>
-                                {isSelected && (
-                                    <div className="absolute top-2 right-4">
-                                        <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-                                    </div>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+            <div className="w-full max-w-md flex justify-between bg-slate-900 p-4 rounded-2xl mb-4 border border-white/5 shadow-lg">
+                <span className="font-bold text-indigo-400 uppercase tracking-tight">{teamName}</span>
+                <span className={`font-mono font-bold text-xl ${timeLeft !== null && timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                    {timeLeft ?? '--'}s
+                </span>
             </div>
 
-            {/* Durum Alt Barı */}
-            <div className="mt-6 pb-4">
-                <div className="max-w-xs mx-auto text-center">
-                    {selected ? (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-3xl animate-in slide-in-from-bottom">
-                            <p className="text-emerald-400 font-black text-xs uppercase tracking-widest">✅ CEVAP GÖNDERİLDİ</p>
-                            <p className="text-slate-500 text-[10px] mt-1 font-bold italic">Öğretmenin yeni soruya geçmesini bekleyin.</p>
-                        </div>
-                    ) : currentQuestion ? (
-                        <div className="text-indigo-400/40 font-black text-[10px] uppercase tracking-widest animate-pulse">
-                            HIZLI CEVAPLA, LİDERLİĞİ AL!
-                        </div>
-                    ) : null}
-                </div>
+            <div className="w-full max-w-md bg-slate-900 p-8 rounded-[2.5rem] border-2 border-indigo-500/10 text-center mb-6 shadow-2xl">
+                <h3 className="text-xl font-bold leading-tight">{currentQuestion?.question || "Soru bekleniyor..."}</h3>
+            </div>
+
+            <div className="w-full max-w-md grid grid-cols-1 gap-4">
+                {ANSWERS.map((ans) => {
+                    const isSelected = selected === ans;
+                    const isTimeUp = timeLeft === 0;
+                    const isCorrect = currentQuestion?.correctAnswer === ans;
+
+                    let bg = "bg-slate-800 border-slate-700";
+                    if (!isTimeUp) {
+                        if (isSelected) bg = "bg-indigo-600 scale-[1.02] border-indigo-400 shadow-[0_0_20px_rgba(79,70,229,0.3)]";
+                    } else {
+                        if (isCorrect) bg = "bg-emerald-600 border-emerald-400 opacity-100";
+                        else if (isSelected) bg = "bg-red-600 border-red-400 opacity-100";
+                        else bg = "bg-slate-900 opacity-20 border-transparent";
+                    }
+
+                    return (
+                        <button
+                            key={ans}
+                            onClick={() => handleSelectOption(ans)}
+                            disabled={isTimeUp}
+                            className={`p-5 rounded-2xl border-b-4 transition-all flex items-center active:border-b-0 active:translate-y-1 ${bg}`}
+                        >
+                            <span className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 font-black text-xl ${isSelected ? 'bg-white text-indigo-600' : 'bg-black/20 text-indigo-400'}`}>
+                                {ans}
+                            </span>
+                            <span className="font-bold text-lg">{currentQuestion?.options?.[ans]}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="mt-8 text-center">
+                {selected && !timeLeft && (
+                    <p className="text-indigo-500 text-[10px] font-black tracking-[0.2em] animate-pulse">SÜRE BİTENE KADAR DEĞİŞTİREBİLİRSİN</p>
+                )}
             </div>
         </div>
     );

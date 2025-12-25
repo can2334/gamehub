@@ -2,338 +2,299 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { gameApi, TeamStatus } from '../services/api';
+import toast, { Toaster } from 'react-hot-toast';
+import Link from 'next/link'; // Yönlendirme için eklendi
 
-const TEAMS = [
-    { name: 'Kırmızı', color: 'from-red-500 to-red-900', shadow: 'shadow-red-500/40', border: 'border-red-500/50', text: 'text-red-400' },
-    { name: 'Mavi', color: 'from-blue-500 to-blue-900', shadow: 'shadow-blue-500/40', border: 'border-blue-500/50', text: 'text-blue-400' },
-    { name: 'Sarı', color: 'from-amber-400 to-amber-700', shadow: 'shadow-amber-500/40', border: 'border-amber-400/50', text: 'text-amber-400' },
-    { name: 'Yeşil', color: 'from-emerald-500 to-emerald-800', shadow: 'shadow-emerald-500/40', border: 'border-emerald-500/50', text: 'text-emerald-400' }
+const TEAMS_CONFIG = [
+    { name: 'Kırmızı', color: 'from-red-500 to-red-900', border: 'border-red-500/50', text: 'text-red-400' },
+    { name: 'Mavi', color: 'from-blue-500 to-blue-900', border: 'border-blue-500/50', text: 'text-blue-400' },
+    { name: 'Sarı', color: 'from-amber-400 to-amber-700', border: 'border-amber-400/50', text: 'text-amber-400' },
+    { name: 'Yeşil', color: 'from-emerald-500 to-emerald-800', border: 'border-emerald-500/50', text: 'text-emerald-400' }
 ];
 
-const HARFLER = ['A', 'B', 'C', 'D'];
+const BACKEND_URL = "https://gamebackend.cansalman332.workers.dev";
 
-export default function MultiGamePage() {
-    const [groupCode, setGroupCode] = useState<string>("");
-    const [category, setCategory] = useState<string>("bilisim");
+export default function MultiGameAdmin() {
+    const [groupCode, setGroupCode] = useState("");
     const [activeTeams, setActiveTeams] = useState<TeamStatus[]>([]);
-    const [isLive, setIsLive] = useState<boolean>(false);
-    const [showScoreboard, setShowScoreboard] = useState<boolean>(false);
-    const [gameStatus, setGameStatus] = useState<string>("active");
     const [questions, setQuestions] = useState<any[]>([]);
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
-    const [isLoading, setIsLoading] = useState(false);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [isLive, setIsLive] = useState(false);
+    const [gameStatus, setGameStatus] = useState("active");
+    const [showAddModal, setShowAddModal] = useState(false);
 
-    const intervalRef = useRef<number | null>(null);
+    const [newQ, setNewQ] = useState({
+        ders: "Ders Adı",
+        question: "",
+        options: { A: "", B: "", C: "", D: "" },
+        correctAnswer: "A",
+        sure: 30
+    });
+
+    const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         const savedCode = localStorage.getItem("admin_groupCode");
-        const savedCategory = localStorage.getItem("admin_category");
-        const savedIndex = localStorage.getItem("admin_questionIndex");
-
         if (savedCode) {
             setGroupCode(savedCode);
-            setCategory(savedCategory || "bilisim");
-            setCurrentQuestionIndex(Number(savedIndex) || 0);
             setIsLive(true);
             startPolling(savedCode);
-            loadQuestions(savedCategory || "bilisim");
+            loadQuestions();
         }
+        return () => stopPolling();
     }, []);
 
-    const loadQuestions = async (cat: string) => {
+    const loadQuestions = async () => {
         try {
-            const res = await fetch(`https://gamebackend.cansalman332.workers.dev/api/questions?category=${cat}`);
+            const res = await fetch(`${BACKEND_URL}/api/multigame`);
             const data = await res.json();
             if (Array.isArray(data)) setQuestions(data);
-        } catch (err) {
-            console.error("Sorular yüklenemedi:", err);
+        } catch (e) { toast.error("Sorular yüklenemedi"); }
+    };
+
+    const startPolling = (code: string) => {
+        stopPolling();
+        pollingRef.current = setInterval(async () => {
+            try {
+                const data = await gameApi.getSessionStatus(code);
+                if (data.status === "finished") {
+                    setGameStatus("finished");
+                    stopPolling();
+                    return;
+                }
+                if (data.teams) setActiveTeams([...data.teams]);
+                if (data.currentQuestionIndex !== undefined) setCurrentQuestionIndex(data.currentQuestionIndex);
+                setGameStatus(data.status || "active");
+            } catch (e) { console.error("Polling error"); }
+        }, 2000);
+    };
+
+    const stopPolling = () => {
+        if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+        }
+    };
+
+    const copyToClipboard = () => {
+        if (groupCode) {
+            navigator.clipboard.writeText(groupCode);
+            toast.success("Oda kodu kopyalandı!", {
+                icon: '📋',
+                style: { borderRadius: '12px', background: '#1e293b', color: '#fff', border: '1px solid #6366f1' }
+            });
         }
     };
 
     const handleSetupGame = async () => {
-        setIsLoading(true);
+        const t = toast.loading("Arena kuruluyor...");
         try {
             const { code } = await gameApi.generateCode();
+            await gameApi.startSession(code, "multigame");
             setGroupCode(code);
-            await gameApi.startSession(code, category);
             localStorage.setItem("admin_groupCode", code);
-            localStorage.setItem("admin_category", category);
-            localStorage.setItem("admin_questionIndex", "0");
             setIsLive(true);
             setGameStatus("active");
-            setCurrentQuestionIndex(0);
-            await loadQuestions(category);
             startPolling(code);
-        } catch (err) {
-            alert("Oda oluşturulamadı!");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const startPolling = (code: string) => {
-        if (intervalRef.current) window.clearInterval(intervalRef.current);
-        intervalRef.current = window.setInterval(async () => {
-            try {
-                const data = await gameApi.getSessionStatus(code) as any;
-                if (data.teams) setActiveTeams(data.teams);
-                if (data.status === "finished") setGameStatus("finished");
-            } catch (err) {
-                console.log("Bağlantı bekleniyor...");
-            }
-        }, 2000);
+            loadQuestions();
+            toast.success("Arena Hazır!", { id: t });
+        } catch (e) { toast.error("Hata oluştu", { id: t }); }
     };
 
     const handleNextQuestion = async () => {
-        if (!groupCode || currentQuestionIndex >= questions.length - 1) {
-            handleFinishGame();
+        if (currentQuestionIndex >= questions.length - 1) {
+            toast("Bu son soruydu! Yarışmayı bitirebilirsiniz.", { icon: '🏁' });
             return;
         }
-
         try {
-            const nextIndex = currentQuestionIndex + 1;
-            // Frontend'de anlık temizlik yap ki "bekliyor" efekti görünsün
-            setActiveTeams(prev => prev.map(t => ({ ...t, selectedAnswer: null })));
-
             await gameApi.resetAnswers(groupCode);
-            setCurrentQuestionIndex(nextIndex);
-            localStorage.setItem("admin_questionIndex", nextIndex.toString());
-        } catch (err) {
-            console.error("Sıfırlama hatası:", err);
-        }
+            setActiveTeams(prev => prev.map(t => ({ ...t, selectedAnswer: null })));
+            setCurrentQuestionIndex(prev => prev + 1);
+            toast.success("Yeni soruya geçildi!");
+        } catch (e) { toast.error("Hata!"); }
     };
 
-    const handleFinishGame = async () => {
-        if (!groupCode) return;
-        if (!window.confirm("Arena kapatılsın mı? Skorlar kesinleşecek.")) return;
+    const confirmFinish = () => {
+        toast((t) => (
+            <div className="flex flex-col gap-2">
+                <span className="font-bold text-sm text-center text-white italic">Yarışmayı bitirmek ve sonuçları göstermek istiyor musunuz?</span>
+                <div className="flex gap-2">
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            const loadId = toast.loading("Sonuçlar hesaplanıyor...");
+                            await gameApi.finishSession(groupCode);
+                            stopPolling();
+                            setGameStatus("finished");
+                            toast.success("Yarışma sona erdi!", { id: loadId });
+                        }}
+                        className="bg-indigo-600 px-3 py-1 rounded text-white text-xs font-black"
+                    >
+                        Evet, Bitir
+                    </button>
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="bg-slate-700 px-3 py-1 rounded text-white text-xs"
+                    >
+                        Vazgeç
+                    </button>
+                </div>
+            </div>
+        ), { duration: 6000, style: { background: '#0f172a', border: '1px solid #6366f1' } });
+    };
 
+    const handleSaveQuestion = async () => {
+        const t = toast.loading("Soru kaydediliyor...");
         try {
-            await fetch(`https://gamebackend.cansalman332.workers.dev/api/session/finish`, {
+            const res = await fetch(`${BACKEND_URL}/api/multigame`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ groupCode })
+                body: JSON.stringify(newQ)
             });
-            setGameStatus("finished");
-            setShowScoreboard(true);
-        } catch (err) {
-            console.error("Oyun bitirilemedi:", err);
-        }
+            if (res.ok) {
+                toast.success("Soru Eklendi", { id: t });
+                setShowAddModal(false);
+                loadQuestions();
+            }
+        } catch (e) { toast.error("Hata!", { id: t }); }
     };
 
-    const currentQuestion = questions[currentQuestionIndex];
-
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-100 p-4 md:p-8 font-sans selection:bg-indigo-500 overflow-x-hidden">
+        <div className="min-h-screen bg-[#020617] text-white p-6 font-sans">
+            <Toaster position="top-right" reverseOrder={false} />
 
-            {/* Arka Plan Süslemeleri */}
-            <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-500/10 blur-[120px] rounded-full"></div>
-            </div>
-
-            <div className="max-w-7xl mx-auto space-y-8">
-
-                {/* --- HEADER PANEL --- */}
-                <div className="bg-slate-900/60 backdrop-blur-2xl border border-slate-800 p-6 rounded-[2.5rem] flex flex-col lg:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden">
-                    <div className="flex flex-col gap-1 relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_10px_#6366f1]"></div>
-                            <h1 className="text-xl font-black tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent uppercase">
-                                Arena Admin Control
-                            </h1>
-                        </div>
-                        <button
-                            onClick={() => { localStorage.clear(); window.location.reload(); }}
-                            className="text-[9px] font-bold text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest"
-                        >
-                            [ Sistemi Sıfırla ]
-                        </button>
-                    </div>
-
-                    <div className="flex flex-wrap justify-center gap-3 relative z-10">
-                        <select
-                            className="bg-slate-950 border border-slate-700 text-slate-300 px-5 py-3 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                            disabled={isLive}
-                        >
-                            <option value="bilisim">💻 Bilişim Teknolojileri</option>
-                            <option value="tabu_fizik">⚛️ Tabu Fizik</option>
-                        </select>
-
-                        <button
-                            onClick={handleSetupGame}
-                            disabled={isLoading}
-                            className={`px-8 py-3 rounded-2xl font-black transition-all active:scale-95 shadow-xl shadow-indigo-500/20 
-                                ${isLive ? 'bg-slate-800 text-indigo-400 border border-indigo-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}
-                        >
-                            {isLoading ? "HAZIRLANIYOR..." : isLive ? "ARENA AKTİF" : "ARENAYI KUR"}
-                        </button>
-                    </div>
-
-                    <div className="bg-slate-950 px-8 py-4 rounded-[2rem] border border-slate-800 flex flex-col items-center min-w-[160px] shadow-inner">
-                        <span className="text-[10px] uppercase font-black tracking-[0.4em] text-indigo-500/60 mb-1">Grup Kodu</span>
-                        <div className="text-4xl font-black font-mono text-white tracking-[0.2em]">
-                            {groupCode || "----"}
-                        </div>
-                    </div>
+            {/* Header */}
+            <div className="max-w-6xl mx-auto flex justify-between items-center bg-slate-900 p-6 rounded-3xl border border-slate-800 mb-8 shadow-2xl">
+                <div>
+                    <h1 className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">ARENA PRO ADMIN</h1>
+                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Live Multi-Game Control Center</p>
                 </div>
+                <div className="flex gap-4 items-center">
+                    {/* SORU EKLE YERİNE DERSLER BUTONU VE YÖNLENDİRME */}
+                    <Link href="/admin/multigame/sorular" className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-5 py-2 rounded-xl text-xs font-bold hover:bg-indigo-500/20 transition-all">
+                        📚 DERSLER VE SORULAR
+                    </Link>
+                    <button onClick={() => setShowAddModal(true)} className="bg-slate-800 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all">➕ SORU EKLE</button>
 
-                {/* --- SORU EKRANI --- */}
-                {isLive && currentQuestion && gameStatus !== "finished" && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <div className="bg-gradient-to-b from-slate-900/40 to-slate-950/40 border border-white/5 p-10 rounded-[3rem] shadow-2xl relative">
-                            <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-indigo-600/10 text-indigo-400 px-4 py-1 rounded-full text-[10px] font-black border border-indigo-500/20">
-                                SORU {currentQuestionIndex + 1} / {questions.length}
-                            </div>
-
-                            <h2 className="text-2xl md:text-4xl font-bold text-center leading-tight my-10 bg-gradient-to-b from-white to-slate-400 bg-clip-text text-transparent">
-                                {currentQuestion.question || currentQuestion.word}
-                            </h2>
-
-                            {currentQuestion.options && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-5xl mx-auto">
-                                    {Object.entries(currentQuestion.options).map(([key, val]: any, idx) => {
-                                        // Eğer key sayı ise (0,1,2,3), harfe çevir
-                                        const label = isNaN(Number(key)) ? key : HARFLER[idx];
-                                        const isCorrect = String(currentQuestion.correctAnswer) === String(key);
-
-                                        return (
-                                            <div key={key} className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300
-                                                ${isCorrect ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'bg-slate-950/50 border-slate-800 text-slate-400'}`}>
-                                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm
-                                                    ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-indigo-400'}`}>
-                                                    {label}
-                                                </span>
-                                                <span className="font-medium">{val}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* --- TAKIM ARENASI --- */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {TEAMS.map((team) => {
-                        const teamData = activeTeams.find(t => t.teamName === team.name);
-                        const hasAnswered = !!teamData?.selectedAnswer;
-
-                        return (
-                            <div key={team.name} className="group">
-                                <div className={`h-full relative rounded-[2.5rem] border-2 transition-all duration-500 p-8 flex flex-col items-center justify-center gap-4
-                                    ${hasAnswered
-                                        ? `bg-slate-900 ${team.border} ${team.shadow} scale-[1.02]`
-                                        : 'bg-slate-900/20 border-slate-800 opacity-60'}`}>
-
-                                    <h3 className={`text-sm font-black uppercase tracking-widest ${team.text}`}>
-                                        {team.name} Takımı
-                                    </h3>
-
-                                    <div className="relative">
-                                        <div className={`text-7xl font-black transition-all duration-700 ${hasAnswered ? 'scale-110 text-white' : 'text-slate-800'}`}>
-                                            {hasAnswered ? teamData.selectedAnswer : "?"}
-                                        </div>
-                                        {hasAnswered && (
-                                            <div className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full animate-ping"></div>
-                                        )}
-                                    </div>
-
-                                    <div className="bg-slate-950/80 px-4 py-1 rounded-full border border-white/5">
-                                        <span className="text-indigo-400 font-black text-xs">{teamData?.score || 0} PTS</span>
-                                    </div>
-
-                                    {/* Cevap Durumu Barı */}
-                                    <div className="w-full h-1 bg-slate-800 rounded-full mt-2 overflow-hidden">
-                                        <div className={`h-full transition-all duration-1000 ${hasAnswered ? `w-full bg-gradient-to-r ${team.color}` : 'w-0'}`}></div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-            <br /><br /><br /><br /><br /><br /><br /><br />
-            {/* --- FLOATING ACTION BAR --- */}
-            {isLive && (
-                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-slate-900/80 backdrop-blur-2xl p-4 rounded-[2rem] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 animate-in slide-in-from-bottom duration-500">
-                    {gameStatus !== "finished" ? (
-                        <>
-                            <div className="px-4 border-r border-slate-700 hidden md:block">
-                                <div className="text-[9px] font-black text-slate-500 uppercase">Kontrol Paneli</div>
-                                <div className="text-xs font-bold text-indigo-400">Canlı Oturum</div>
-                            </div>
-                            <button
-                                onClick={handleNextQuestion}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center gap-3 shadow-lg shadow-emerald-600/20"
-                            >
-                                <span className="text-lg">⏭️</span> SONRAKİ SORU
-                            </button>
-                            <button
-                                onClick={handleFinishGame}
-                                className="bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95"
-                            >
-                                BİTİR
-                            </button>
-                        </>
+                    {!isLive ? (
+                        <button onClick={handleSetupGame} className="bg-indigo-600 px-8 py-2 rounded-xl text-xs font-black shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all">BAŞLAT</button>
                     ) : (
-                        <button
-                            onClick={() => setShowScoreboard(true)}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/40"
+                        <div
+                            onClick={copyToClipboard}
+                            className="bg-slate-950 px-6 py-2 rounded-xl border border-indigo-500/30 text-center cursor-pointer hover:border-indigo-400 active:scale-95 transition-all group relative"
                         >
-                            🏆 ŞAMPİYONU İLAN ET
-                        </button>
+                            <span className="block text-[8px] text-slate-500 font-bold group-hover:text-indigo-400">KOPYALA</span>
+                            <span className="text-xl font-mono font-black text-indigo-400">{groupCode}</span>
+                        </div>
                     )}
                 </div>
-            )}
+            </div>
 
-            {/* --- MODERN SCOREBOARD MODAL --- */}
-            {showScoreboard && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#020617]/95 backdrop-blur-xl animate-in fade-in duration-300">
-                    <div className="bg-slate-900 border border-indigo-500/30 w-full max-w-2xl rounded-[3.5rem] p-12 relative shadow-[0_0_100px_rgba(99,102,241,0.2)] overflow-hidden">
-
-                        {/* Modal Background Decor */}
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 blur-3xl rounded-full"></div>
-
-                        <button onClick={() => setShowScoreboard(false)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-colors">
-                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-
-                        <div className="text-center mb-12">
-                            <div className="text-6xl mb-4 animate-bounce">🏆</div>
-                            <h2 className="text-5xl font-black text-white italic tracking-tighter uppercase mb-2">ARENA BİTTİ</h2>
-                            <p className="text-slate-500 font-bold text-sm tracking-[0.3em]">FINAL SIRALAMASI</p>
-                        </div>
-
-                        <div className="space-y-4">
-                            {[...activeTeams]
-                                .sort((a, b) => (b.score || 0) - (a.score || 0))
-                                .map((team, idx) => (
-                                    <div key={team.teamName} className={`flex justify-between items-center p-6 rounded-[2rem] border-2 transition-all duration-500
-                                        ${idx === 0 ? 'bg-indigo-600/20 border-indigo-500 shadow-lg shadow-indigo-500/20 scale-105' : 'bg-slate-800/40 border-slate-700/50'}`}>
-                                        <div className="flex items-center gap-6">
-                                            <span className={`text-3xl font-black ${idx === 0 ? 'text-indigo-400' : 'text-slate-600'}`}>#{idx + 1}</span>
-                                            <div>
-                                                <div className="text-xl font-black text-white uppercase">{team.teamName}</div>
-                                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Savaşçı Takımı</div>
+            {gameStatus === "finished" ? (
+                <div className="max-w-4xl mx-auto bg-slate-900 p-10 rounded-[3rem] border-2 border-indigo-500 shadow-[0_0_50px_rgba(99,102,241,0.2)] text-center animate-in zoom-in duration-500">
+                    <h2 className="text-5xl font-black mb-10 text-indigo-400 italic tracking-tighter">🏁 FİNAL SKORLARI</h2>
+                    <div className="space-y-4 mb-10">
+                        {[...activeTeams].sort((a, b) => b.score - a.score).map((team, idx) => (
+                            <div key={idx} className={`flex justify-between items-center p-6 rounded-2xl border ${idx === 0 ? 'bg-indigo-500/20 border-indigo-400' : 'bg-black/40 border-white/5'}`}>
+                                <span className="text-2xl font-black">#{idx + 1} {team.teamName}</span>
+                                <span className="text-3xl font-mono font-black text-indigo-400">{team.score} PUAN</span>
+                            </div>
+                        ))}
+                    </div>
+                    <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-white text-black px-12 py-4 rounded-2xl font-black">YENİ YARIŞMA BAŞLAT</button>
+                </div>
+            ) : (
+                <>
+                    {/* Soru Ekranı - Ders Adı, Soru ve Tüm Detaylar Eklendi */}
+                    {isLive && questions[currentQuestionIndex] && (
+                        <div className="max-w-4xl mx-auto bg-slate-900/50 p-10 rounded-[3rem] border border-white/5 mb-10 text-center backdrop-blur-sm">
+                            <div className="flex justify-between mb-6">
+                                {/* DERS ADI BURADA */}
+                                <div className="flex flex-col items-start">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase italic">AKTİF DERS</span>
+                                    <span className="text-sm font-black text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
+                                        📖 {questions[currentQuestionIndex].ders}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <span className="text-xs font-black text-indigo-400 uppercase bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20">
+                                        SORU {currentQuestionIndex + 1} / {questions.length}
+                                    </span>
+                                    <span className="text-xs font-black text-red-500 bg-red-500/10 px-3 py-1 rounded-lg border border-red-500/20">
+                                        ⏱️ {questions[currentQuestionIndex].sure}s
+                                    </span>
+                                </div>
+                            </div>
+                            <h2 className="text-3xl font-bold mb-8">{questions[currentQuestionIndex].question}</h2>
+                            <div className="grid grid-cols-2 gap-4 text-left">
+                                {Object.entries(questions[currentQuestionIndex].options || {}).map(([key, val]: any) => {
+                                    const isCorrect = questions[currentQuestionIndex].correctAnswer === key;
+                                    return (
+                                        <div key={key} className={`p-4 rounded-2xl border transition-all ${isCorrect ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'border-slate-800 bg-black/20'}`}>
+                                            <div className="flex justify-between items-center">
+                                                <span><span className={`font-black mr-2 ${isCorrect ? 'text-emerald-400' : 'text-indigo-500'}`}>{key}:</span> {val}</span>
+                                                {isCorrect && <span className="text-[9px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded">DOĞRU CEVAP</span>}
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-3xl font-mono text-white font-black">{team.score || 0}</span>
-                                            <span className="text-[10px] font-black text-indigo-400 uppercase">PUAN</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
+                            </div>
                         </div>
+                    )}
 
-                        <button
-                            onClick={() => { localStorage.clear(); window.location.reload(); }}
-                            className="w-full mt-10 py-5 bg-white text-black rounded-3xl font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all active:scale-95"
-                        >
-                            Yeni Arena Başlat
-                        </button>
+                    {/* Takımlar */}
+                    <div className="max-w-6xl mx-auto grid grid-cols-4 gap-4 pb-32">
+                        {TEAMS_CONFIG.map(config => {
+                            const teamData = activeTeams.find(t => t.teamName === config.name);
+                            return (
+                                <div key={config.name} className={`p-6 rounded-[2rem] border-2 transition-all duration-500 ${teamData?.selectedAnswer ? config.border + ' bg-slate-900 shadow-xl scale-105' : 'border-slate-800 opacity-40'}`}>
+                                    <h3 className={`text-xs font-black uppercase mb-4 ${config.text}`}>{config.name}</h3>
+                                    <div className="text-5xl font-black mb-6 font-mono text-center">
+                                        {teamData?.selectedAnswer || "—"}
+                                    </div>
+                                    <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                                        <span className="text-[10px] font-bold text-slate-500">SCORE</span>
+                                        <span className="text-xl font-black text-indigo-400">{teamData?.score || 0}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Alt Kontrol Barı */}
+                    {isLive && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex gap-4 z-40 bg-black/50 backdrop-blur-xl p-4 rounded-[2.5rem] border border-white/10 shadow-2xl">
+                            <button onClick={handleNextQuestion} className="bg-indigo-600 px-10 py-4 rounded-2xl font-black shadow-lg hover:bg-indigo-500 active:scale-95 transition-all">SONRAKİ SORU</button>
+                            <button onClick={confirmFinish} className="bg-red-600 px-10 py-4 rounded-2xl font-black shadow-lg hover:bg-red-500 active:scale-95 transition-all">YARIŞMAYI BİTİR</button>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Soru Ekleme Modalı (HİÇBİR ŞEY SİLİNMEDİ) */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl">
+                        <h2 className="text-xl font-black mb-6 text-indigo-400 uppercase tracking-widest text-center">YENİ SORU EKLE</h2>
+                        <div className="space-y-4">
+                            <input className="w-full bg-black p-4 rounded-xl border border-slate-800 focus:border-indigo-500 outline-none transition-all" placeholder="Ders Adı" value={newQ.ders} onChange={e => setNewQ({ ...newQ, ders: e.target.value })} />
+                            <textarea className="w-full bg-black p-4 rounded-xl border border-slate-800 min-h-[100px] focus:border-indigo-500 outline-none transition-all" placeholder="Soru Metni" value={newQ.question} onChange={e => setNewQ({ ...newQ, question: e.target.value })} />
+                            <div className="grid grid-cols-2 gap-2">
+                                {['A', 'B', 'C', 'D'].map(h => (
+                                    <input key={h} className="bg-black p-3 rounded-xl border border-slate-800 focus:border-indigo-500 outline-none" placeholder={`${h} Şıkkı`} value={(newQ.options as any)[h]} onChange={e => setNewQ({ ...newQ, options: { ...newQ.options, [h]: e.target.value } })} />
+                                ))}
+                            </div>
+                            <div className="flex gap-4">
+                                <select className="flex-1 bg-black p-4 rounded-xl border border-slate-800 outline-none text-white" value={newQ.correctAnswer} onChange={e => setNewQ({ ...newQ, correctAnswer: e.target.value })}>
+                                    <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                                </select>
+                                <input type="number" className="flex-1 bg-black p-4 rounded-xl border border-slate-800 outline-none text-white" placeholder="Süre (sn)" value={newQ.sure} onChange={e => setNewQ({ ...newQ, sure: Number(e.target.value) })} />
+                            </div>
+                            <div className="flex gap-4 mt-6">
+                                <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 font-bold text-slate-500 hover:text-white transition-all">İPTAL</button>
+                                <button onClick={handleSaveQuestion} className="flex-1 bg-indigo-600 py-4 rounded-2xl font-black shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all">KAYDET</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
