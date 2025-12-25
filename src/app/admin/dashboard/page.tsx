@@ -115,10 +115,16 @@ export default function AdminMain() {
 
                                         <button
                                             onClick={() => {
-                                                // Eğer slug içinde 'tabu' kelimesi geçiyorsa Tabu sayfasına git
-                                                if (game.slug.includes("tabu")) {
+                                                // 1. ÖNCELİK: Eğer slug "multigame" ise direkt o sayfaya git
+                                                if (game.slug === "multigame") {
+                                                    router.push(`/admin/multigame`);
+                                                }
+                                                // 2. ÖNCELİK: Eğer slug içinde 'tabu' geçiyorsa Tabu yönetimine git
+                                                else if (game.slug.includes("tabu")) {
                                                     router.push(`/admin/game/tabu?slug=${game.slug}`);
-                                                } else {
+                                                }
+                                                // 3. VARSAYILAN: Diğer her şey için Quiz yönetimine git
+                                                else {
                                                     router.push(`/admin/game/quiz?slug=${game.slug}`);
                                                 }
                                             }}

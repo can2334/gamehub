@@ -15,6 +15,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Breadcrumb bileşenini import ediyoruz
+import AdminBreadcrumb from "../../../components/AdminBreadcrumb";
+
 export default function TabuEditPage() {
     const { slug } = useParams<{ slug: string }>();
     const router = useRouter();
@@ -30,6 +33,7 @@ export default function TabuEditPage() {
         isExtra: 0 // Başlangıçta 0 (Normal puan)
     });
 
+    // Slug'dan ders ismini temizleyip alıyoruz (Örn: tabu_turkce -> TÜRKÇE)
     const branchName = slug ? slug.replace("tabu_", "").toUpperCase() : "GENEL";
 
     const parseForbidden = (data: any) => {
@@ -87,8 +91,12 @@ export default function TabuEditPage() {
     return (
         <div className="min-h-screen bg-[#020617] text-white p-6 md:p-12">
             <div className="max-w-5xl mx-auto">
+
+                {/* --- BREADCRUMB BURAYA EKLENDİ --- */}
+                <AdminBreadcrumb currentPage={`TABU / ${branchName} EDİTÖRÜ`} />
+
                 {/* HEADER */}
-                <div className="flex justify-between items-center mb-10">
+                <div className="flex justify-between items-center mb-10 mt-6">
                     <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
                         <ChevronLeft size={18} /> <span className="text-xs font-black uppercase">Geri</span>
                     </button>
@@ -168,18 +176,16 @@ export default function TabuEditPage() {
                                     ))}
                                 </div>
 
-                                {/* EKSTRA PUAN TOGGLE */}
                                 <div className="pt-2">
                                     <button
                                         onClick={() => setNewWord({ ...newWord, isExtra: newWord.isExtra === 1 ? 0 : 1 })}
                                         className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${newWord.isExtra === 1 ? 'bg-amber-500/10 border-amber-500 text-amber-500' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <Sparkles size={18} />
-                                            <span className="text-xs font-black uppercase tracking-tight">Bu Bir Bonus Kartı (2 Puan)</span>
-                                        </div>
-                                        <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${newWord.isExtra === 1 ? 'bg-amber-500 border-amber-500 text-black' : 'border-slate-700'}`}>
-                                            {newWord.isExtra === 1 && <Check size={14} strokeWidth={4} />}
+                                            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${newWord.isExtra === 1 ? 'bg-amber-500 border-amber-500 text-black' : 'border-slate-700'}`}>
+                                                {newWord.isExtra === 1 && <Check size={14} strokeWidth={4} />}
+                                            </div>
+                                            <span className="text-xs font-black uppercase tracking-tight">Bonus Kartı (2 Puan)</span>
                                         </div>
                                     </button>
                                 </div>

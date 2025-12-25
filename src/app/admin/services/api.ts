@@ -74,7 +74,15 @@ export const gameApi = {
             status: data.status
         };
     },
-
+    deleteQuestion: async (id: number) => {
+        const res = await fetch(`${BASE_URL}/questions`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+        });
+        if (!res.ok) throw new Error("Soru silinemedi");
+        return res.json();
+    },
     resetAnswers: async (code: string) => {
         return fetch(`${BASE_URL}/session/reset?code=${code}`, {
             method: 'POST',
