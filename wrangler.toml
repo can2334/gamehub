@@ -1,5 +1,0 @@
-name = "gamehub"
-
-[[d1_databases]]
-binding = "GAMEDB"
-database_name = "gamedb"
