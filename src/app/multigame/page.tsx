@@ -115,7 +115,7 @@ export default function StudentGamepad() {
         setJoined(false);
         setGroupCode("");
         setTeamName("");
-        window.location.href = "/";
+        window.location.href = "/multigame";
     };
 
     const handleJoin = async () => {
@@ -145,7 +145,10 @@ export default function StudentGamepad() {
             toast.error("Sunucuya bağlanılamadı!");
         }
     };
-
+    //5.  seyirci ekranına yönlendirme butonu 
+    const handleSpectate = () => {
+        router.push('/seyirci');
+    };
     // --- GÖRÜNÜMLER ---
 
     // 1. Giriş Ekranı
@@ -172,6 +175,21 @@ export default function StudentGamepad() {
                             <option value="Yeşil" className="bg-[#050816]">🟢 YEŞIL TAKIM</option>
                         </select>
                         <button onClick={handleJoin} className="w-full bg-indigo-600 hover:bg-indigo-500 p-5 rounded-2xl font-black text-lg active:scale-[0.97] transition-all shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)]">ARENAYA KATIL</button>
+                        {/* AYIRICI ÇİZGİ */}
+                        <div className="flex items-center gap-4 py-2">
+                            <div className="h-[1px] bg-white/5 flex-grow" />
+                            <span className="text-[10px] font-black text-slate-600">OR</span>
+                            <div className="h-[1px] bg-white/5 flex-grow" />
+                        </div>
+
+                        {/* SEYİRCİ BUTONU */}
+                        <button
+                            onClick={handleSpectate}
+                            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl font-bold text-sm text-slate-400 transition-all flex items-center justify-center gap-3 active:scale-95"
+                        >
+                            <Eye size={18} className="text-indigo-500" />
+                            SEYİRCİ MODUNA GEÇ
+                        </button>
                     </div>
                 </motion.div>
             </div>
