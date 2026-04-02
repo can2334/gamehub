@@ -6,7 +6,7 @@ import { Trash2, Plus, ArrowLeft, Loader2, X, AlertCircle, Edit3 } from "lucide-
 // Breadcrumb bileşenini import ediyoruz
 import AdminBreadcrumb from "../../../components/AdminBreadcrumb";
 
-const API_URL = "https://gamebackend.cansalman332.workers.dev/api";
+const API_URL = "http://localhost:3001/api";
 
 export default function QuestionManager() {
     const params = useParams();

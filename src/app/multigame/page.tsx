@@ -4,10 +4,97 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { gameApi, TeamStatus } from '../admin/services/api';
 import toast, { Toaster } from 'react-hot-toast';
-import { Gamepad, Trophy, Star, ArrowLeft, Eye, BookOpen, Zap, ShieldCheck, Loader2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Trophy, Star, ArrowLeft, Eye, BookOpen,
+    Zap, ShieldCheck, Loader2, Terminal, LogOut
+} from 'lucide-react';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 
 const ANSWERS = ['A', 'B', 'C', 'D'];
+
+/* ─── CURSOR GLOW ─── */
+function CursorGlow() {
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+    const sx = useSpring(x, { stiffness: 80, damping: 20 });
+    const sy = useSpring(y, { stiffness: 80, damping: 20 });
+
+    useEffect(() => {
+        const move = (e: MouseEvent) => { x.set(e.clientX); y.set(e.clientY); };
+        window.addEventListener("mousemove", move);
+        return () => window.removeEventListener("mousemove", move);
+    }, []);
+
+    return (
+        <motion.div
+            style={{ left: sx, top: sy }}
+            className="pointer-events-none fixed z-[999] -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+        >
+            <div className="w-full h-full rounded-full bg-emerald-500/5 blur-[80px]" />
+        </motion.div>
+    );
+}
+
+/* ─── SCAN LINE ─── */
+function ScanLine() {
+    return (
+        <motion.div
+            className="pointer-events-none fixed left-0 right-0 h-[2px] z-[998] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"
+            animate={{ top: ["0%", "100%"] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+        />
+    );
+}
+
+/* ─── GRID OVERLAY ─── */
+function GridOverlay() {
+    return (
+        <div
+            className="fixed inset-0 pointer-events-none z-0 opacity-[0.03]"
+            style={{
+                backgroundImage: `
+                    linear-gradient(rgba(16,185,129,1) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(16,185,129,1) 1px, transparent 1px)
+                `,
+                backgroundSize: "60px 60px",
+            }}
+        />
+    );
+}
+
+/* ─── TIMER RING ─── */
+function TimerRing({ timeLeft, totalTime }: { timeLeft: number; totalTime: number }) {
+    const radius = 36;
+    const circumference = 2 * Math.PI * radius;
+    const progress = totalTime > 0 ? timeLeft / totalTime : 0;
+    const strokeDashoffset = circumference * (1 - progress);
+    const isWarning = timeLeft <= 5;
+
+    return (
+        <div className="relative w-24 h-24 flex items-center justify-center">
+            <svg className="absolute inset-0 -rotate-90" width="96" height="96">
+                {/* Track */}
+                <circle cx="48" cy="48" r={radius} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="4" />
+                {/* Progress */}
+                <circle
+                    cx="48" cy="48" r={radius}
+                    fill="none"
+                    stroke={isWarning ? "#ef4444" : "#10b981"}
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s" }}
+                />
+            </svg>
+            <span className={`font-mono font-black text-3xl relative z-10 ${isWarning ? "text-red-400" : "text-white"}`}>
+                {timeLeft}
+            </span>
+        </div>
+    );
+}
 
 export default function StudentGamepad() {
     const router = useRouter();
@@ -19,8 +106,14 @@ export default function StudentGamepad() {
     const [gameStatus, setGameStatus] = useState<string>("waiting");
     const [allTeams, setAllTeams] = useState<TeamStatus[]>([]);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const [totalTime, setTotalTime] = useState<number>(30);
     const [myScore, setMyScore] = useState<number>(0);
     const [lessonName, setLessonName] = useState("YÜKLENİYOR...");
+
+    // ── BUG FIX: isTimeUp ayrı state olarak takip ediliyor ──
+    // timeLeft === 0 yerine bu flag kullanılıyor; yeni soru gelince false'a sıfırlanıyor
+    const [isTimeUp, setIsTimeUp] = useState(false);
+
     const scoreSubmittedRef = useRef(false);
 
     // 1. Giriş Bilgilerini Yükle
@@ -34,7 +127,7 @@ export default function StudentGamepad() {
         }
     }, []);
 
-    // 2. Ana API Polling (Veri Çekme)
+    // 2. Ana API Polling
     useEffect(() => {
         if (!joined || !groupCode) return;
         const interval = setInterval(async () => {
@@ -51,19 +144,23 @@ export default function StudentGamepad() {
                     if (me) setMyScore(me.score || 0);
                 }
 
-                // Soru kontrolü
                 if (data.currentQuestion) {
+                    // Yeni soru geldi mi kontrol et
                     if (!currentQuestion || currentQuestion.id !== data.currentQuestion.id) {
                         setCurrentQuestion(data.currentQuestion);
                         setSelected(null);
+                        setIsTimeUp(false); // ── BUG FIX: yeni soruda sıfırla ──
                         scoreSubmittedRef.current = false;
 
-                        // --- F5 Koruması: Süre Mantığı ---
+                        const initialTime = data.currentQuestion.sure ?? 30;
+                        setTotalTime(initialTime);
+
                         const savedTime = localStorage.getItem(`timeLeft_${data.currentQuestion.id}`);
                         if (savedTime !== null) {
-                            setTimeLeft(parseInt(savedTime));
+                            const parsed = parseInt(savedTime);
+                            setTimeLeft(parsed);
+                            if (parsed <= 0) setIsTimeUp(true);
                         } else {
-                            const initialTime = data.currentQuestion.sure ?? 30;
                             setTimeLeft(initialTime);
                             localStorage.setItem(`timeLeft_${data.currentQuestion.id}`, initialTime.toString());
                         }
@@ -71,6 +168,7 @@ export default function StudentGamepad() {
                 } else {
                     setCurrentQuestion(null);
                     setTimeLeft(null);
+                    setIsTimeUp(false);
                 }
             } catch (err) {
                 console.error("Hata:", err);
@@ -79,24 +177,30 @@ export default function StudentGamepad() {
         return () => clearInterval(interval);
     }, [joined, groupCode, currentQuestion, teamName]);
 
-    // 3. Geri Sayım ve LocalStorage Güncelleme
+    // 3. Geri Sayım
     useEffect(() => {
         if (timeLeft === null || timeLeft <= 0 || !currentQuestion) return;
 
         const timer = setInterval(() => {
             setTimeLeft(prev => {
-                const nextValue = prev && prev > 0 ? prev - 1 : 0;
-                localStorage.setItem(`timeLeft_${currentQuestion.id}`, nextValue.toString());
-                return nextValue;
+                if (!prev || prev <= 1) {
+                    clearInterval(timer);
+                    localStorage.setItem(`timeLeft_${currentQuestion.id}`, "0");
+                    setIsTimeUp(true); // ── BUG FIX: süre bitince flag'i set et ──
+                    return 0;
+                }
+                const next = prev - 1;
+                localStorage.setItem(`timeLeft_${currentQuestion.id}`, next.toString());
+                return next;
             });
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [timeLeft, currentQuestion]);
+    }, [timeLeft !== null && timeLeft > 0 ? currentQuestion?.id : null]);
 
-    // 4. Otomatik Cevap Gönderimi (Süre Bittiğinde)
+    // 4. Otomatik Cevap Gönderimi
     useEffect(() => {
-        if (timeLeft === 0 && selected && !scoreSubmittedRef.current && currentQuestion) {
+        if (isTimeUp && selected && !scoreSubmittedRef.current && currentQuestion) {
             scoreSubmittedRef.current = true;
             gameApi.submitFinalAnswer({
                 groupCode,
@@ -107,10 +211,9 @@ export default function StudentGamepad() {
                 scoreSubmittedRef.current = false;
             });
         }
-    }, [timeLeft, selected, currentQuestion]);
+    }, [isTimeUp]);
 
     const handleExit = () => {
-        // Her şeyi temizle
         localStorage.clear();
         setJoined(false);
         setGroupCode("");
@@ -124,12 +227,12 @@ export default function StudentGamepad() {
             return;
         }
         try {
-            const response = await fetch("https://gamebackend.cansalman332.workers.dev/api/session/join", {
+            const response = await fetch("http://localhost:3001/api/session/join", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     groupCode: groupCode.toUpperCase().trim(),
-                    teamName: teamName
+                    teamName
                 })
             });
             const data = await response.json();
@@ -141,193 +244,434 @@ export default function StudentGamepad() {
             } else {
                 toast.error(data.error || "Giriş yapılamadı");
             }
-        } catch (error) {
+        } catch {
             toast.error("Sunucuya bağlanılamadı!");
         }
     };
-    //5.  seyirci ekranına yönlendirme butonu 
-    const handleSpectate = () => {
-        router.push('/seyirci');
-    };
-    // --- GÖRÜNÜMLER ---
 
-    // 1. Giriş Ekranı
+    /* ══════════════════════════════════════════════
+       EKRAN 1 — GİRİŞ
+    ══════════════════════════════════════════════ */
     if (!joined) {
         return (
-            <div className="min-h-screen bg-[#050816] flex items-center justify-center p-6 text-white relative overflow-hidden font-sans">
+            <div
+                className="min-h-screen bg-[#030712] flex items-center justify-center p-6 text-white relative overflow-hidden"
+                style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+            >
                 <Toaster position="top-center" />
-                <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px]" />
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/[0.03] backdrop-blur-3xl p-10 rounded-[3rem] w-full max-w-sm border border-white/10 relative z-10 shadow-2xl">
-                    <div className="flex flex-col items-center mb-10">
-                        <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(79,70,229,0.5)]">
-                            <Zap className="text-white" size={32} fill="white" />
-                        </div>
-                        <h2 className="text-center font-black text-white italic uppercase text-4xl tracking-tighter">GAME<span className="text-indigo-500">HUB</span></h2>
-                        <p className="text-slate-500 text-[10px] font-bold tracking-[0.3em] uppercase mt-2">Arena Giriş Portalı</p>
-                    </div>
-                    <div className="space-y-4">
-                        <input type="text" placeholder="ODA KODU" className="w-full p-5 bg-white/[0.05] rounded-2xl text-center font-mono text-2xl border border-white/5 focus:border-indigo-500/50 outline-none uppercase transition-all" onChange={(e) => setGroupCode(e.target.value)} value={groupCode} />
-                        <select className="w-full p-5 bg-white/[0.05] rounded-2xl font-bold border border-white/5 outline-none text-slate-300 appearance-none focus:border-indigo-500/50 transition-all cursor-pointer" onChange={(e) => setTeamName(e.target.value)} value={teamName}>
-                            <option value="" className="bg-[#050816]">TAKIMINI SEÇ</option>
-                            <option value="Kırmızı" className="bg-[#050816]">🔴 KIRMIZI TAKIM</option>
-                            <option value="Mavi" className="bg-[#050816]">🔵 MAVI TAKIM</option>
-                            <option value="Sarı" className="bg-[#050816]">🟡 SARI TAKIM</option>
-                            <option value="Yeşil" className="bg-[#050816]">🟢 YEŞIL TAKIM</option>
-                        </select>
-                        <button onClick={handleJoin} className="w-full bg-indigo-600 hover:bg-indigo-500 p-5 rounded-2xl font-black text-lg active:scale-[0.97] transition-all shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)]">ARENAYA KATIL</button>
-                        {/* AYIRICI ÇİZGİ */}
-                        <div className="flex items-center gap-4 py-2">
-                            <div className="h-[1px] bg-white/5 flex-grow" />
-                            <span className="text-[10px] font-black text-slate-600">OR</span>
-                            <div className="h-[1px] bg-white/5 flex-grow" />
+                <CursorGlow />
+                <ScanLine />
+                <GridOverlay />
+
+                {/* Blobs */}
+                <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                    <motion.div
+                        animate={{ scale: [1, 1.1, 1], opacity: [0.07, 0.12, 0.07] }}
+                        transition={{ repeat: Infinity, duration: 8 }}
+                        className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-emerald-500 blur-[160px] rounded-full"
+                    />
+                    <motion.div
+                        animate={{ scale: [1, 1.15, 1], opacity: [0.04, 0.07, 0.04] }}
+                        transition={{ repeat: Infinity, duration: 10, delay: 2 }}
+                        className="absolute bottom-0 -left-[10%] w-[40%] h-[50%] bg-cyan-500 blur-[160px] rounded-full"
+                    />
+                </div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative z-10 w-full max-w-sm"
+                >
+                    {/* Card */}
+                    <div className="relative p-8 rounded-3xl bg-[#0a0f1a] border border-white/[0.06] overflow-hidden">
+                        {/* Corner deco */}
+                        <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-emerald-500/30" />
+                        <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-emerald-500/30" />
+                        <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-emerald-500/30" />
+                        <div className="absolute bottom-4 right-4 w-4 h-4 border-b border-r border-emerald-500/30" />
+
+                        {/* Logo */}
+                        <div className="flex flex-col items-center mb-10">
+                            <div className="p-4 rounded-2xl bg-slate-950 border border-white/5 mb-5">
+                                <Terminal className="text-emerald-400" size={28} />
+                            </div>
+                            <h2 className="font-black text-white uppercase text-3xl tracking-[-0.04em]">
+                                GAME<span className="text-emerald-400">_</span>HUB
+                            </h2>
+                            <p className="text-[9px] text-slate-600 font-black tracking-[0.35em] uppercase mt-2">
+                                Arena Giriş Portalı
+                            </p>
                         </div>
 
-                        {/* SEYİRCİ BUTONU */}
-                        <button
-                            onClick={handleSpectate}
-                            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl font-bold text-sm text-slate-400 transition-all flex items-center justify-center gap-3 active:scale-95"
-                        >
-                            <Eye size={18} className="text-indigo-500" />
-                            SEYİRCİ MODUNA GEÇ
-                        </button>
+                        <div className="space-y-3">
+                            <input
+                                type="text"
+                                placeholder="ODA KODU"
+                                className="w-full p-4 bg-[#060b13] border border-white/[0.04] focus:border-emerald-500/40 rounded-2xl text-center font-mono text-xl outline-none uppercase transition-all duration-300 placeholder:text-slate-700"
+                                onChange={(e) => setGroupCode(e.target.value)}
+                                value={groupCode}
+                            />
+                            <select
+                                className="w-full p-4 bg-[#060b13] border border-white/[0.04] focus:border-emerald-500/40 rounded-2xl font-bold outline-none text-slate-300 appearance-none cursor-pointer transition-all duration-300 text-sm tracking-wider"
+                                onChange={(e) => setTeamName(e.target.value)}
+                                value={teamName}
+                            >
+                                <option value="" className="bg-[#0a0f1a]">TAKIMINI SEÇ</option>
+                                <option value="Kırmızı" className="bg-[#0a0f1a]">🔴 KIRMIZI TAKIM</option>
+                                <option value="Mavi" className="bg-[#0a0f1a]">🔵 MAVİ TAKIM</option>
+                                <option value="Sarı" className="bg-[#0a0f1a]">🟡 SARI TAKIM</option>
+                                <option value="Yeşil" className="bg-[#0a0f1a]">🟢 YEŞİL TAKIM</option>
+                            </select>
+
+                            <button
+                                onClick={handleJoin}
+                                className="group relative w-full p-4 rounded-2xl font-black text-sm tracking-[0.2em] uppercase text-slate-950 overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-emerald-400 group-hover:bg-emerald-300 transition-colors duration-300" />
+                                <span className="relative flex items-center justify-center gap-2">
+                                    <Zap size={16} /> Arenaya Katıl
+                                </span>
+                            </button>
+
+                            <div className="flex items-center gap-4 py-1">
+                                <div className="h-px bg-white/[0.04] flex-grow" />
+                                <span className="text-[9px] font-black text-slate-700 tracking-[0.2em]">VEYA</span>
+                                <div className="h-px bg-white/[0.04] flex-grow" />
+                            </div>
+
+                            <button
+                                onClick={() => router.push('/seyirci')}
+                                className="w-full p-4 rounded-2xl font-bold text-sm text-slate-500 border border-white/[0.04] bg-white/[0.02] hover:border-emerald-500/20 hover:text-slate-300 transition-all duration-300 flex items-center justify-center gap-3"
+                            >
+                                <Eye size={16} className="text-emerald-500" />
+                                <span className="text-[11px] tracking-[0.2em] uppercase font-black">Seyirci Moduna Geç</span>
+                            </button>
+                        </div>
+
+                        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />
                     </div>
                 </motion.div>
             </div>
         );
     }
 
-    // 2. Bekleme Odası (Öğretmen soru açmadıysa)
+    /* ══════════════════════════════════════════════
+       EKRAN 2 — BEKLEME ODASI
+    ══════════════════════════════════════════════ */
     if (gameStatus === "waiting" || !currentQuestion) {
         return (
-            <div className="min-h-screen bg-[#050816] flex flex-col items-center justify-center p-6 text-white text-center">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center">
-                    <Loader2 size={64} className="text-indigo-500 animate-spin mb-6" />
-                    <h2 className="text-3xl font-black mb-2 uppercase italic">HAZIR OL!</h2>
-                    <p className="text-slate-400 max-w-[250px] text-sm font-medium">Öğretmen arena savaşını başlatmak üzere. İlk soru gelene kadar bekle...</p>
-                    <div className="mt-10 p-6 bg-white/[0.03] border border-white/10 rounded-3xl w-full max-w-xs">
-                        <span className="text-[10px] text-indigo-400 font-black block mb-2 uppercase tracking-widest">Kayıtlı Takım</span>
-                        <div className="text-xl font-bold">{teamName}</div>
+            <div
+                className="min-h-screen bg-[#030712] flex flex-col items-center justify-center p-6 text-white text-center relative overflow-hidden"
+                style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+            >
+                <CursorGlow />
+                <ScanLine />
+                <GridOverlay />
+                <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                    <motion.div
+                        animate={{ scale: [1, 1.1, 1], opacity: [0.07, 0.11, 0.07] }}
+                        transition={{ repeat: Infinity, duration: 8 }}
+                        className="absolute -top-[20%] -right-[10%] w-[50%] h-[60%] bg-emerald-500 blur-[160px] rounded-full"
+                    />
+                </div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7 }}
+                    className="relative z-10 flex flex-col items-center max-w-sm w-full"
+                >
+                    <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                        className="mb-8 p-5 rounded-2xl bg-[#0a0f1a] border border-white/[0.04]"
+                    >
+                        <Loader2 size={32} className="text-emerald-400" />
+                    </motion.div>
+
+                    <p className="text-[10px] font-black tracking-[0.35em] text-emerald-500 uppercase mb-4 flex items-center gap-3">
+                        <span className="h-px w-4 bg-emerald-500/50" />
+                        // Bekleme Odası
+                        <span className="h-px w-4 bg-emerald-500/50" />
+                    </p>
+                    <h2 className="text-3xl font-black text-white uppercase tracking-[-0.03em] mb-3">Hazır Ol!</h2>
+                    <p className="text-slate-600 text-xs leading-relaxed mb-10 max-w-[220px]">
+                        Öğretmen arena savaşını başlatmak üzere. İlk soru gelene kadar bekle.
+                    </p>
+
+                    {/* Team badge */}
+                    <div className="relative w-full p-6 rounded-3xl bg-[#0a0f1a] border border-white/[0.04] overflow-hidden">
+                        <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-emerald-500/20" />
+                        <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-emerald-500/20" />
+                        <span className="text-[9px] text-emerald-500 font-black block mb-2 uppercase tracking-[0.3em]">Kayıtlı Takım</span>
+                        <div className="text-xl font-black text-white uppercase">{teamName}</div>
+                        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
                     </div>
-                    <button onClick={handleExit} className="mt-8 text-slate-500 text-xs font-bold hover:text-red-400 transition-all flex items-center gap-2">
-                        <ArrowLeft size={14} /> ODADAN ÇIK
+
+                    <button
+                        onClick={handleExit}
+                        className="mt-8 flex items-center gap-2 text-slate-700 text-[10px] font-black uppercase tracking-[0.2em] hover:text-red-400 transition-colors duration-300"
+                    >
+                        <ArrowLeft size={12} /> Odadan Çık
                     </button>
                 </motion.div>
             </div>
         );
     }
 
-    // 3. Oyun Sonu (Burası senin kodunla aynı)
+    /* ══════════════════════════════════════════════
+       EKRAN 3 — OYUN SONU
+    ══════════════════════════════════════════════ */
     if (gameStatus === "finished") {
         const sortedTeams = [...allTeams].sort((a, b) => (b.score || 0) - (a.score || 0));
+        const myRank = sortedTeams.findIndex(t => t.teamName === teamName) + 1;
+
         return (
-            <div className="min-h-screen bg-[#050816] flex flex-col items-center justify-center p-6 text-white text-center">
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md">
-                    <Trophy size={100} className="text-yellow-500 mx-auto mb-8 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)]" />
-                    <h2 className="text-5xl font-black mb-10 uppercase italic">FİNAL</h2>
-                    <div className="space-y-3 bg-white/[0.02] p-8 rounded-[3rem] border border-white/10 backdrop-blur-xl">
-                        {sortedTeams.map((team, idx) => (
-                            <div key={idx} className={`flex justify-between items-center p-5 rounded-3xl border ${team.teamName === teamName ? 'border-indigo-500 bg-indigo-500/20' : 'border-white/5 bg-black/40'}`}>
-                                <div className="flex items-center gap-4">
-                                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${idx === 0 ? 'bg-yellow-500 text-black' : 'bg-white/10'}`}>{idx + 1}</span>
-                                    <span className="font-black uppercase">{team.teamName}</span>
-                                </div>
-                                <span className="font-mono font-black text-2xl text-indigo-400">{team.score || 0}</span>
-                            </div>
-                        ))}
+            <div
+                className="min-h-screen bg-[#030712] flex flex-col items-center justify-center p-6 text-white text-center relative overflow-hidden"
+                style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+            >
+                <CursorGlow />
+                <ScanLine />
+                <GridOverlay />
+                <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                    <motion.div
+                        animate={{ scale: [1, 1.1, 1], opacity: [0.07, 0.12, 0.07] }}
+                        transition={{ repeat: Infinity, duration: 8 }}
+                        className="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-[40%] bg-yellow-500 blur-[160px] rounded-full"
+                    />
+                </div>
+
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative z-10 w-full max-w-md"
+                >
+                    <div className="mb-8">
+                        <motion.div
+                            animate={{ y: [0, -8, 0] }}
+                            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                            className="inline-block"
+                        >
+                            <Trophy size={64} className="text-yellow-400 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)] mx-auto" />
+                        </motion.div>
+                        <p className="text-[10px] font-black tracking-[0.35em] text-yellow-500 uppercase mt-4 mb-2">// Final Sonuçları</p>
+                        <h2 className="text-4xl font-black text-white uppercase tracking-[-0.04em]">Oyun Bitti</h2>
                     </div>
-                    <button onClick={handleExit} className="mt-12 bg-white text-black px-10 py-5 rounded-3xl font-black flex items-center gap-3 mx-auto">
-                        <ArrowLeft size={20} /> ANA MENÜ
+
+                    <div className="relative p-6 rounded-3xl bg-[#0a0f1a] border border-white/[0.04] mb-6 overflow-hidden">
+                        <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-white/10" />
+                        <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-white/10" />
+
+                        <div className="space-y-3">
+                            {sortedTeams.map((team, idx) => {
+                                const isMe = team.teamName === teamName;
+                                return (
+                                    <motion.div
+                                        key={idx}
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: idx * 0.1 }}
+                                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${isMe
+                                                ? "border-emerald-500/40 bg-emerald-500/[0.06]"
+                                                : "border-white/[0.04] bg-white/[0.02]"
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${idx === 0 ? "bg-yellow-500 text-slate-950" :
+                                                    idx === 1 ? "bg-slate-400 text-slate-950" :
+                                                        idx === 2 ? "bg-orange-600 text-slate-950" :
+                                                            "bg-white/5 text-slate-500"
+                                                }`}>
+                                                {idx + 1}
+                                            </span>
+                                            <span className={`font-black uppercase text-sm ${isMe ? "text-emerald-400" : "text-slate-400"}`}>
+                                                {team.teamName}
+                                                {isMe && <span className="text-[9px] ml-2 text-emerald-600">(SEN)</span>}
+                                            </span>
+                                        </div>
+                                        <span className="font-mono font-black text-lg text-white">{team.score || 0}</span>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent" />
+                    </div>
+
+                    <button
+                        onClick={handleExit}
+                        className="group relative w-full p-4 rounded-2xl font-black text-sm tracking-[0.2em] uppercase text-slate-950 overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-emerald-400 group-hover:bg-emerald-300 transition-colors duration-300" />
+                        <span className="relative flex items-center justify-center gap-2">
+                            <ArrowLeft size={16} /> Ana Menü
+                        </span>
                     </button>
                 </motion.div>
             </div>
         );
     }
 
-    // 4. Aktif Oyun Ekranı (Oyun Devam Ediyor)
+    /* ══════════════════════════════════════════════
+       EKRAN 4 — AKTİF OYUN
+    ══════════════════════════════════════════════ */
     return (
-        <div className="min-h-screen bg-[#050816] p-4 text-white flex flex-col items-center relative overflow-hidden font-sans">
+        <div
+            className="min-h-screen bg-[#030712] p-4 text-white flex flex-col items-center relative overflow-hidden"
+            style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+        >
             <Toaster position="top-center" />
+            <CursorGlow />
+            <ScanLine />
+            <GridOverlay />
 
-            {/* Üst Bar */}
-            <motion.div className="w-full max-w-md bg-white/[0.03] border border-white/10 backdrop-blur-2xl rounded-[2rem] p-4 flex items-center justify-center gap-3 mb-6 relative z-10">
-                <BookOpen size={18} className="text-indigo-400" />
-                <span className="text-xs font-black uppercase tracking-[0.3em] text-slate-200">{lessonName}</span>
-            </motion.div>
-
-            {/* Dashboard */}
-            <div className="w-full max-w-md bg-white/[0.03] backdrop-blur-3xl p-8 rounded-[3rem] mb-6 border border-white/10 shadow-2xl relative z-10">
-                <div className="flex justify-between items-center relative z-20">
-                    <div className="flex flex-col text-left">
-                        <span className="text-[10px] font-black text-indigo-500/60 uppercase tracking-widest mb-1">TAKIMIN</span>
-                        <span className="text-white font-black uppercase text-xl">{teamName}</span>
-                    </div>
-
-                    <div className={`flex flex-col items-center justify-center w-20 h-20 rounded-full border-[4px] transition-all ${timeLeft && timeLeft <= 5 ? 'border-red-500 animate-pulse' : 'border-white/10'}`}>
-                        <span className={`font-mono font-black text-3xl ${timeLeft && timeLeft <= 5 ? 'text-red-500' : 'text-white'}`}>
-                            {timeLeft ?? '--'}
-                        </span>
-                    </div>
-
-                    <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-black text-emerald-500/60 uppercase tracking-widest mb-1">PUANIN</span>
-                        <div className="text-white font-black text-xl flex items-center gap-2">
-                            {myScore} <Star size={18} className="text-yellow-500" fill="currentColor" />
-                        </div>
-                    </div>
-                </div>
+            {/* Blobs */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                <motion.div
+                    animate={{ scale: [1, 1.1, 1], opacity: [0.05, 0.08, 0.05] }}
+                    transition={{ repeat: Infinity, duration: 8 }}
+                    className="absolute -top-[20%] -right-[10%] w-[50%] h-[60%] bg-emerald-500 blur-[160px] rounded-full"
+                />
+                <motion.div
+                    animate={{ scale: [1, 1.15, 1], opacity: [0.03, 0.06, 0.03] }}
+                    transition={{ repeat: Infinity, duration: 10, delay: 2 }}
+                    className="absolute bottom-0 -left-[10%] w-[40%] h-[50%] bg-cyan-500 blur-[160px] rounded-full"
+                />
             </div>
 
-            {/* Soru Kartı */}
-            <motion.div key={currentQuestion?.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md bg-gradient-to-br from-indigo-600 to-blue-700 p-[2px] rounded-[2.5rem] mb-6 shadow-2xl z-10">
-                <div className="bg-[#0b112b] p-8 rounded-[2.4rem] text-center">
-                    <div className="inline-flex items-center gap-2 mb-4 bg-white/5 px-4 py-1.5 rounded-full border border-white/10">
-                        <ShieldCheck size={14} className="text-indigo-400" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">SORU AKTİF</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-white leading-relaxed">
-                        {currentQuestion?.question}
-                    </h3>
+            {/* ─── LESSON BAR ─── */}
+            <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-md relative p-3 rounded-2xl bg-[#0a0f1a] border border-white/[0.04] flex items-center justify-center gap-3 mb-4 z-10"
+            >
+                <BookOpen size={14} className="text-emerald-400" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{lessonName}</span>
+                <div className="absolute right-3 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[8px] font-black text-emerald-600 uppercase tracking-wider">Live</span>
                 </div>
             </motion.div>
 
-            {/* Cevap Butonları */}
-            <div className="w-full max-w-md grid gap-3 mb-10 relative z-10">
-                {ANSWERS.map((ans, idx) => {
+            {/* ─── HUD BAR ─── */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="w-full max-w-md relative p-5 rounded-3xl bg-[#0a0f1a] border border-white/[0.04] flex items-center justify-between mb-4 z-10 overflow-hidden"
+            >
+                <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-white/10" />
+                <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-white/10" />
+
+                {/* Team */}
+                <div className="flex flex-col text-left">
+                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-1">Takım</span>
+                    <span className="text-white font-black uppercase text-base tracking-tight">{teamName}</span>
+                </div>
+
+                {/* Timer */}
+                <TimerRing timeLeft={timeLeft ?? 0} totalTime={totalTime} />
+
+                {/* Score */}
+                <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-black text-yellow-600 uppercase tracking-[0.2em] mb-1">Puan</span>
+                    <div className="text-white font-black text-base flex items-center gap-1.5">
+                        {myScore}
+                        <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                    </div>
+                </div>
+
+                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+            </motion.div>
+
+            {/* ─── SORU KARTI ─── */}
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={currentQuestion?.id}
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                    className="w-full max-w-md relative p-7 rounded-3xl bg-[#0a0f1a] border border-white/[0.04] mb-4 z-10 overflow-hidden"
+                >
+                    <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-emerald-500/20" />
+                    <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-emerald-500/20" />
+
+                    <div className="flex items-center gap-2 mb-5">
+                        <ShieldCheck size={12} className="text-emerald-500" />
+                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-emerald-600">Soru Aktif</span>
+                    </div>
+
+                    <h3 className="text-base font-bold text-white leading-relaxed">
+                        {currentQuestion?.question}
+                    </h3>
+
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+                </motion.div>
+            </AnimatePresence>
+
+            {/* ─── CEVAP BUTONLARI ─── */}
+            <div className="w-full max-w-md grid gap-3 mb-8 relative z-10">
+                {ANSWERS.map((ans) => {
                     const isSelected = selected === ans;
-                    const isTimeUp = timeLeft === 0;
                     const isCorrect = currentQuestion?.correctAnswer === ans;
 
-                    let cardStyle = "bg-white/[0.04] border-white/5 text-slate-400";
-                    if (!isTimeUp && isSelected) cardStyle = "bg-indigo-600 border-indigo-400 text-white shadow-xl scale-[1.02]";
+                    // ── BUG FIX: isTimeUp state'i kullanılıyor, timeLeft === 0 değil ──
+                    let style = "bg-[#0a0f1a] border-white/[0.04] text-slate-500 hover:border-white/10 hover:text-slate-300";
+                    let labelStyle = "bg-white/5 text-slate-600";
+
+                    if (!isTimeUp && isSelected) {
+                        style = "bg-emerald-500/10 border-emerald-500/50 text-white scale-[1.02] shadow-[0_0_20px_rgba(16,185,129,0.1)]";
+                        labelStyle = "bg-emerald-500 text-slate-950";
+                    }
 
                     if (isTimeUp) {
-                        if (isCorrect) cardStyle = "bg-emerald-500 border-emerald-400 text-white scale-[1.05]";
-                        else if (isSelected) cardStyle = "bg-red-500 border-red-400 text-white opacity-80";
-                        else cardStyle = "bg-white/[0.02] border-transparent opacity-20 grayscale";
+                        if (isCorrect) {
+                            style = "bg-emerald-500/15 border-emerald-500/60 text-white scale-[1.02]";
+                            labelStyle = "bg-emerald-500 text-slate-950";
+                        } else if (isSelected && !isCorrect) {
+                            style = "bg-red-500/10 border-red-500/40 text-red-400 opacity-80";
+                            labelStyle = "bg-red-500 text-white";
+                        } else {
+                            style = "bg-white/[0.01] border-white/[0.02] opacity-25 grayscale";
+                            labelStyle = "bg-white/5 text-slate-700";
+                        }
                     }
 
                     return (
                         <motion.button
                             key={ans}
+                            whileTap={!isTimeUp ? { scale: 0.98 } : {}}
                             onClick={() => !isTimeUp && setSelected(ans)}
                             disabled={isTimeUp}
-                            className={`p-4 rounded-3xl border-2 transition-all duration-200 flex items-center ${cardStyle}`}
+                            className={`relative flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 overflow-hidden ${style}`}
                         >
-                            <span className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 font-black text-lg ${isSelected ? 'bg-white text-indigo-600' : 'bg-white/10 text-white'}`}>
+                            <span className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center font-black text-sm transition-all duration-300 ${labelStyle}`}>
                                 {ans}
                             </span>
-                            <span className="font-bold text-base">{currentQuestion?.options?.[ans]}</span>
+                            <span className="font-bold text-sm text-left">{currentQuestion?.options?.[ans]}</span>
+
+                            {/* Correct glow */}
+                            {isTimeUp && isCorrect && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="absolute inset-0 bg-emerald-500/5 pointer-events-none"
+                                />
+                            )}
                         </motion.button>
                     );
                 })}
             </div>
 
-            {/* Çıkış Butonu */}
-            <button onClick={handleExit} className="mb-8 flex items-center gap-3 text-slate-600 hover:text-white transition-all">
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                    <ArrowLeft size={14} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Oturumdan Ayrıl</span>
+            {/* ─── ÇIKIŞ ─── */}
+            <button
+                onClick={handleExit}
+                className="relative z-10 mb-6 flex items-center gap-2 text-slate-700 text-[10px] font-black uppercase tracking-[0.25em] hover:text-red-400 transition-colors duration-300 group"
+            >
+                <LogOut size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                Oturumdan Ayrıl
             </button>
         </div>
     );

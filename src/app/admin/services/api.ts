@@ -1,6 +1,6 @@
 // services/api.ts
 
-const BASE_URL = "https://gamebackend.cansalman332.workers.dev";
+const BASE_URL = "http://localhost:3001";
 
 export interface TeamStatus {
     teamName: string;

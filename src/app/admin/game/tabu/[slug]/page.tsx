@@ -47,7 +47,7 @@ export default function TabuEditPage() {
         try {
             setLoading(true);
             setError(null);
-            const res = await fetch(`https://gamebackend.cansalman332.workers.dev/api/questions?category=${slug}`);
+            const res = await fetch(`http://localhost:3001/api/questions?category=${slug}`);
             if (!res.ok) throw new Error("API hatası");
             const json = await res.json();
             setWords(Array.isArray(json) ? json : []);
@@ -63,13 +63,13 @@ export default function TabuEditPage() {
 
     const handleDelete = async (id: number) => {
         if (!confirm("Bu kelime silinsin mi?")) return;
-        const res = await fetch(`https://gamebackend.cansalman332.workers.dev/api/questions?category=${slug}&id=${id}`, { method: "DELETE" });
+        const res = await fetch(`http://localhost:3001/api/questions?category=${slug}&id=${id}`, { method: "DELETE" });
         if (res.ok) setWords(prev => prev.filter(w => w.id !== id));
     };
 
     const handleAddWord = async () => {
         if (!newWord.word.trim()) return;
-        const res = await fetch(`https://gamebackend.cansalman332.workers.dev/api/questions?category=${slug}`, {
+        const res = await fetch(`http://localhost:3001/api/questions?category=${slug}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

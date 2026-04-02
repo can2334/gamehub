@@ -3,7 +3,7 @@ import { useState, useEffect, Suspense } from "react"; // Suspense eklendi (Next
 import { useSearchParams } from "next/navigation"; // Kategori okumak için eklendi
 import { HelpCircle, Users, BrainCircuit, Timer, Loader2, Trophy, XCircle, Home } from "lucide-react";
 
-const API_URL = "https://gamebackend.cansalman332.workers.dev/api/questions";
+const API_URL = "http://localhost:3001/api/questions";
 
 interface Question {
     question: string;

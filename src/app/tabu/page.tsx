@@ -20,11 +20,12 @@ export default function TabuArena() {
     const [passCount, setPassCount] = useState(3); // PAS HAKKI STATE
     const [isProcessing, setIsProcessing] = useState(false);
 
+
     const startGame = async (subjectId: string) => {
         setSelectedSubject(subjectId);
         setGameState("loading");
         try {
-            const res = await fetch(`https://gamebackend.cansalman332.workers.dev/api/questions?category=tabu_${subjectId}`);
+            const res = await fetch(`http://localhost:3001/api/questions?category=${subjectId}`);
             const data = await res.json();
             setWords(data.sort(() => Math.random() - 0.5));
             setGameState("playing");

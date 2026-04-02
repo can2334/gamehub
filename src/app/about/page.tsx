@@ -1,288 +1,384 @@
 "use client";
-import React from "react";
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion, Variants } from "framer-motion";
+import { motion, useMotionValue, useSpring } from "framer-motion";
 import {
-    Cpu, Zap, ArrowLeft, BookOpen,
-    GraduationCap, User, Lightbulb, Search, Target,
-    Code2, Rocket, Layout, Sparkles, Terminal, Globe, Layers
+    ArrowLeft, Layout, Terminal, Layers, Globe,
+    Target, Zap, GraduationCap, Code2, User, Sparkles
 } from "lucide-react";
 
-// Animasyon varyantlarını daha akıcı hale getirdik
-const containerVariants: Variants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: (i: number = 1) => ({
-        opacity: 1,
-        y: 0,
-        transition: {
-            delay: i * 0.1,
-            duration: 0.7,
-            ease: [0.215, 0.61, 0.355, 1], // Custom cubic-bezier for smooth feel
-        },
-    }),
-};
+/* ─── CURSOR GLOW ─── */
+function CursorGlow() {
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+    const sx = useSpring(x, { stiffness: 80, damping: 20 });
+    const sy = useSpring(y, { stiffness: 80, damping: 20 });
 
-const iconHover = {
-    scale: 1.2,
-    rotate: 5,
-    transition: { type: "spring", stiffness: 400, damping: 10 }
-};
+    useEffect(() => {
+        const move = (e: MouseEvent) => { x.set(e.clientX); y.set(e.clientY); };
+        window.addEventListener("mousemove", move);
+        return () => window.removeEventListener("mousemove", move);
+    }, []);
 
+    return (
+        <motion.div
+            style={{ left: sx, top: sy }}
+            className="pointer-events-none fixed z-[999] -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+        >
+            <div className="w-full h-full rounded-full bg-emerald-500/5 blur-[80px]" />
+        </motion.div>
+    );
+}
+
+/* ─── SCAN LINE ─── */
+function ScanLine() {
+    return (
+        <motion.div
+            className="pointer-events-none fixed left-0 right-0 h-[2px] z-[998] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"
+            animate={{ top: ["0%", "100%"] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+        />
+    );
+}
+
+/* ─── GRID OVERLAY ─── */
+function GridOverlay() {
+    return (
+        <div
+            className="fixed inset-0 pointer-events-none z-0 opacity-[0.03]"
+            style={{
+                backgroundImage: `
+                    linear-gradient(rgba(16,185,129,1) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(16,185,129,1) 1px, transparent 1px)
+                `,
+                backgroundSize: "80px 80px",
+            }}
+        />
+    );
+}
+
+/* ─── TECH CARD ─── */
+function TechCard({ icon, label, val, delay }: { icon: React.ReactNode; label: string; val: string; delay: number }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ y: -4 }}
+            className="group relative p-6 rounded-2xl bg-[#0a0f1a] border border-white/[0.04] hover:border-emerald-500/20 transition-all duration-500 overflow-hidden"
+        >
+            <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-white/10 group-hover:border-emerald-500/30 transition-colors duration-500" />
+            <div className="mb-4 p-2.5 w-fit rounded-xl bg-slate-950 border border-white/5 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">
+                <div className="text-emerald-400">{icon}</div>
+            </div>
+            <div className="text-[9px] font-black text-slate-700 tracking-[0.3em] mb-1 uppercase">{label}</div>
+            <div className="text-xs font-black text-white uppercase tracking-wider">{val}</div>
+            <div className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-700 opacity-60" />
+        </motion.div>
+    );
+}
+
+/* ─── ANALYSIS CARD ─── */
+function AnalysisCard({
+    icon, title, text, accent, delay
+}: { icon: React.ReactNode; title: string; text: string; accent: string; delay: number }) {
+    const colors: Record<string, { border: string; icon: string; glow: string }> = {
+        emerald: { border: "hover:border-emerald-500/30", icon: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", glow: "hover:shadow-[0_0_40px_rgba(16,185,129,0.06)]" },
+        cyan: { border: "hover:border-cyan-500/30", icon: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20", glow: "hover:shadow-[0_0_40px_rgba(6,182,212,0.06)]" },
+    };
+    const c = colors[accent];
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ y: -6 }}
+            className={`group relative p-8 rounded-3xl bg-[#0a0f1a] border border-white/[0.04] transition-all duration-500 overflow-hidden ${c.border} ${c.glow}`}
+        >
+            <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-white/10 group-hover:border-white/20 transition-colors duration-500" />
+            <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-white/10 group-hover:border-white/20 transition-colors duration-500" />
+
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500 ${c.icon}`}>
+                {icon}
+            </div>
+            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-4">{title}</h3>
+            <p className="text-slate-500 leading-relaxed text-sm font-mono">{text}</p>
+
+            <div className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-700 opacity-60" />
+        </motion.div>
+    );
+}
+
+/* ─── MAIN PAGE ─── */
 export default function AboutPage() {
     const router = useRouter();
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-300 selection:bg-blue-500/30 overflow-x-hidden font-sans">
-            {/* Dinamik Arka Plan Glow - Daha canlı hale getirildi */}
+        <div
+            className="min-h-screen bg-[#030712] text-slate-300 selection:bg-emerald-500/30 overflow-x-hidden relative"
+            style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+        >
+            <CursorGlow />
+            <ScanLine />
+            <GridOverlay />
+
+            {/* Ambient blobs */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-blue-600/10 blur-[150px] rounded-full" />
-                <div className="absolute bottom-[-10%] left-[-5%] w-[600px] h-[600px] bg-indigo-600/10 blur-[150px] rounded-full" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03]" />
+                <motion.div
+                    animate={{ scale: [1, 1.1, 1], opacity: [0.07, 0.11, 0.07] }}
+                    transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+                    className="absolute -top-[20%] -right-[10%] w-[50%] h-[60%] bg-emerald-500 blur-[160px] rounded-full"
+                />
+                <motion.div
+                    animate={{ scale: [1, 1.15, 1], opacity: [0.04, 0.07, 0.04] }}
+                    transition={{ repeat: Infinity, duration: 10, ease: "easeInOut", delay: 2 }}
+                    className="absolute bottom-0 -left-[10%] w-[40%] h-[50%] bg-cyan-500 blur-[160px] rounded-full"
+                />
             </div>
 
-            <div className="max-w-5xl mx-auto px-6 py-12 relative z-10">
+            <div className="max-w-5xl mx-auto px-8 md:px-16 py-16 relative z-10">
 
-                {/* --- NAVIGATION --- */}
+                {/* ─── NAV ─── */}
                 <motion.header
-                    initial={{ opacity: 0, y: -20 }}
+                    initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-between items-center mb-16 md:mb-24"
+                    transition={{ duration: 0.6 }}
+                    className="flex justify-between items-center mb-20"
                 >
                     <button
                         onClick={() => router.back()}
-                        className="group flex items-center gap-3 text-slate-500 hover:text-white transition-all bg-white/5 px-4 py-2 rounded-full border border-white/5 hover:border-blue-500/30 shadow-xl"
+                        className="group flex items-center gap-3 px-5 py-2.5 rounded-xl border border-white/[0.04] bg-white/[0.02] hover:border-emerald-500/30 hover:text-white text-slate-500 transition-all duration-300"
                     >
-                        <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform text-blue-500" />
-                        <span className="text-[10px] font-black tracking-[0.2em] uppercase">Geri Dön</span>
+                        <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform duration-300 text-emerald-500" />
+                        <span className="text-[10px] font-black tracking-[0.25em] uppercase">Geri Dön</span>
                     </button>
 
-                    <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-blue-500/5 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-blue-500 blur-sm animate-pulse opacity-50 rounded-full" />
-                            <Sparkles size={14} className="text-blue-400 relative z-10" />
-                        </div>
-                        <span className="text-[10px] text-blue-400 font-black tracking-widest uppercase">V2.0 Core Engine</span>
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/5 border border-emerald-500/15">
+                        <Sparkles size={12} className="text-emerald-400" />
+                        <span className="text-[10px] text-emerald-400 font-black tracking-[0.2em] uppercase">V3.0 Core Engine</span>
                     </div>
                 </motion.header>
 
-                {/* --- HERO SECTION --- */}
-                <motion.section
-                    initial="hidden"
-                    animate="visible"
-                    variants={containerVariants}
-                    className="mb-32 relative"
-                >
-                    <div className="absolute -left-10 top-0 w-1 h-24 bg-gradient-to-b from-blue-500 to-transparent hidden md:block" />
-                    <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase italic leading-tight mb-8">
-                        Geleceğin <br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-400 not-italic">
-                            Eğitim Arenası
-                        </span>
-                    </h1>
-                    <p className="text-xl text-slate-400 leading-relaxed max-w-3xl font-medium border-l-2 border-slate-800 pl-8">
-                        Eğitimi statik bir görevden çıkarıp dinamik bir <span className="text-white font-bold underline underline-offset-8 decoration-blue-500/40">dijital serüvene</span> dönüştürüyoruz.
-                        Bilişim Arena, modern web teknolojilerinin gücünü pedagojik oyunlaştırma ile birleştiren bir vizyon projesidir.
-                    </p>
-                </motion.section>
+                {/* ─── HERO ─── */}
+                <section className="mb-28 relative">
+                    <motion.p
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6 }}
+                        className="text-[10px] font-black tracking-[0.35em] text-emerald-500 uppercase mb-6 flex items-center gap-3"
+                    >
+                        <span className="h-px w-6 bg-emerald-500/50" />
+                        // Hakkımızda
+                    </motion.p>
 
-                {/* --- TECH STACK (Yenilenen Bölüm) --- */}
-                <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-32">
-                    {[
-                        { icon: <Layout />, label: "MİMARİ", val: "Next.js 14", color: "blue" },
-                        { icon: <Terminal />, label: "DİL", val: "TypeScript", color: "indigo" },
-                        { icon: <Layers />, label: "STİL", val: "Tailwind CSS", color: "cyan" },
-                        { icon: <Globe />, label: "ALTYAPI", val: "Edge Workers", color: "emerald" }
-                    ].map((item, i) => (
-                        <motion.div
-                            key={i}
-                            custom={i}
-                            initial="hidden"
-                            whileInView="visible"
-                            viewport={{ once: true }}
-                            variants={containerVariants}
-                            className="group bg-white/[0.02] border border-white/5 p-6 rounded-[2rem] hover:bg-white/[0.05] transition-all relative overflow-hidden"
+                    <div className="overflow-hidden mb-6">
+                        <motion.h1
+                            initial={{ y: 80 }}
+                            animate={{ y: 0 }}
+                            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                            className="text-[clamp(2.8rem,7vw,5.5rem)] font-black tracking-[-0.04em] text-white leading-[0.88] uppercase"
                         >
-                            <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:scale-150 transition-transform duration-500">
-                                {item.icon}
-                            </div>
-                            <div className="text-blue-500 mb-4 group-hover:animate-bounce">{item.icon}</div>
-                            <div className="text-[9px] font-black text-slate-500 tracking-[0.3em] mb-1">{item.label}</div>
-                            <div className="text-xs font-black text-white uppercase tracking-wider">{item.val}</div>
-                        </motion.div>
-                    ))}
+                            Geleceğin{" "}
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-cyan-300 to-blue-400">
+                                Eğitim Arenası
+                            </span>
+                        </motion.h1>
+                    </div>
+
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.4 }}
+                        className="max-w-xl text-sm text-slate-500 leading-relaxed border-l border-emerald-500/30 pl-6"
+                    >
+                        Eğitimi statik bir görevden çıkarıp dinamik bir{" "}
+                        <span className="text-slate-300">dijital serüvene</span> dönüştürüyoruz.
+                        Modern web teknolojilerinin gücünü pedagojik oyunlaştırma ile birleştiren bir vizyon projesi.
+                    </motion.p>
                 </section>
 
-                {/* --- MİSYON VE ANALİZ --- */}
-                <div className="mb-32">
-                    <h2 className="text-xs font-black text-blue-500 tracking-[0.4em] uppercase mb-12 flex items-center gap-4">
-                        <div className="h-px w-12 bg-blue-500" /> Analitik Yaklaşım
-                    </h2>
+                {/* ─── TECH STACK ─── */}
+                <section className="mb-28">
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
+                        className="text-[10px] font-black tracking-[0.35em] text-emerald-500 uppercase mb-8 flex items-center gap-3"
+                    >
+                        <span className="h-px w-6 bg-emerald-500/50" />
+                        // Tech Stack
+                    </motion.p>
 
-                    <div className="grid md:grid-cols-2 gap-8">
-                        {[
-                            {
-                                icon: <Target />,
-                                title: "Kalıcı Bilişsel Hafıza",
-                                color: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-                                text: "Bilgiyi sadece okutmak yerine deneyimletiyoruz. Anlık rekabet ve görsel uyaranlar, öğrenilenlerin uzun süreli hafızaya transferini %70 oranında hızlandırır."
-                            },
-                            {
-                                icon: <Zap />,
-                                title: "Dinamik Geri Bildirim",
-                                color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-                                text: "Sistem, her öğrencinin performansını gerçek zamanlı analiz eder. Yanlış cevaplar 'hata' değil, anında düzeltilen 'öğrenme noktaları' olarak kurgulanmıştır."
-                            }
-                        ].map((card, i) => (
-                            <motion.div
-                                key={i}
-                                custom={i}
-                                initial="hidden"
-                                whileInView="visible"
-                                viewport={{ once: true }}
-                                variants={containerVariants}
-                                className="p-8 rounded-[2.5rem] bg-gradient-to-b from-white/[0.04] to-transparent border border-white/5 space-y-5 group hover:border-blue-500/30 transition-all"
-                            >
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${card.color}`}>
-                                    {card.icon}
-                                </div>
-                                <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">
-                                    {card.title}
-                                </h3>
-                                <p className="text-slate-500 leading-relaxed text-sm font-medium">
-                                    {card.text}
-                                </p>
-                            </motion.div>
-                        ))}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <TechCard icon={<Layout size={18} />} label="Mimari" val="Next.js 14" delay={0} />
+                        <TechCard icon={<Terminal size={18} />} label="Dil" val="TypeScript" delay={0.08} />
+                        <TechCard icon={<Layers size={18} />} label="Stil" val="Tailwind CSS" delay={0.16} />
+                        <TechCard icon={<Globe size={18} />} label="Altyapı" val="Edge Workers" delay={0.24} />
                     </div>
-                </div>
+                </section>
 
-                {/* --- GELİŞTİRİCİ PROFİL (Premium Kart) --- */}
+                {/* ─── ANALYSIS ─── */}
+                <section className="mb-28">
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
+                        className="text-[10px] font-black tracking-[0.35em] text-emerald-500 uppercase mb-8 flex items-center gap-3"
+                    >
+                        <span className="h-px w-6 bg-emerald-500/50" />
+                        // Analitik Yaklaşım
+                    </motion.p>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                        <AnalysisCard
+                            icon={<Target size={20} />}
+                            title="Kalıcı Bilişsel Hafıza"
+                            text="Bilgiyi sadece okutmak yerine deneyimletiyoruz. Anlık rekabet ve görsel uyaranlar, öğrenilenlerin uzun süreli hafızaya transferini %70 oranında hızlandırır."
+                            accent="emerald"
+                            delay={0}
+                        />
+                        <AnalysisCard
+                            icon={<Zap size={20} />}
+                            title="Dinamik Geri Bildirim"
+                            text="Sistem, her öğrencinin performansını gerçek zamanlı analiz eder. Yanlış cevaplar 'hata' değil, anında düzeltilen 'öğrenme noktaları' olarak kurgulanmıştır."
+                            accent="cyan"
+                            delay={0.1}
+                        />
+                    </div>
+                </section>
+
+                {/* ─── DEVELOPER PROFILE ─── */}
                 <motion.section
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    className="relative group mb-32"
+                    transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                    className="mb-28"
                 >
-                    {/* Arka plan glow efekti */}
-                    <div className="absolute inset-0 bg-blue-600/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
+                        className="text-[10px] font-black tracking-[0.35em] text-emerald-500 uppercase mb-8 flex items-center gap-3"
+                    >
+                        <span className="h-px w-6 bg-emerald-500/50" />
+                        // Geliştirici
+                    </motion.p>
 
-                    <div className="relative bg-slate-900/40 border border-white/10 p-6 md:p-12 rounded-[3rem] overflow-hidden backdrop-blur-sm">
-                        <div className="grid md:grid-cols-2 gap-12 items-center">
+                    <div className="relative group p-8 md:p-12 rounded-3xl bg-[#0a0f1a] border border-white/[0.04] hover:border-emerald-500/20 transition-all duration-500 overflow-hidden">
+                        {/* Corner decorations */}
+                        <div className="absolute top-4 left-4 w-5 h-5 border-t border-l border-white/10 group-hover:border-emerald-500/30 transition-colors duration-500" />
+                        <div className="absolute top-4 right-4 w-5 h-5 border-t border-r border-white/10 group-hover:border-emerald-500/30 transition-colors duration-500" />
+                        <div className="absolute bottom-4 left-4 w-5 h-5 border-b border-l border-white/10 group-hover:border-emerald-500/30 transition-colors duration-500" />
+                        <div className="absolute bottom-4 right-4 w-5 h-5 border-b border-r border-white/10 group-hover:border-emerald-500/30 transition-colors duration-500" />
 
-                            {/* Sol taraf: Metin ve roller */}
+                        {/* Hover glow */}
+                        <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+
+                        <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+                            {/* Left: Info */}
                             <div>
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
-                                    <User size={12} className="text-blue-500" /> Lead Developer
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] text-[9px] font-black text-slate-600 uppercase tracking-[0.25em] mb-6">
+                                    <User size={10} className="text-emerald-500" /> Lead Developer
                                 </div>
 
-                                <h2 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter leading-none mb-6">
-                                    Umut Can <span className="text-blue-500">Salman</span>
+                                <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none mb-6">
+                                    Umut Can{" "}
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+                                        Salman
+                                    </span>
                                 </h2>
 
-                                <p className="text-slate-400 text-sm leading-relaxed mb-8 font-medium">
-                                    Yazılım dünyasına tutkusu ve yaratıcı yaklaşımıyla Bilişim Arena'yı hayata geçirdi. Modern web teknolojilerini ve kullanıcı deneyimini ön planda tutarak, Türkiye’deki eğitim materyallerini dünya standartlarında erişilebilir ve etkili bir platform haline getirmeyi hedefliyor. Bilişim Arena, Umut’un yazılım bilgisi ve vizyonunu eğitimle buluşturan bir projedir.
+                                <p className="text-slate-500 text-sm leading-relaxed mb-8 font-mono">
+                                    Yazılım dünyasına tutkusu ve yaratıcı yaklaşımıyla Bilişim Arena'yı hayata geçirdi.
+                                    Modern web teknolojilerini ve kullanıcı deneyimini ön planda tutarak Türkiye'deki
+                                    eğitim materyallerini dünya standartlarında erişilebilir bir platforma dönüştürmeyi hedefliyor.
                                 </p>
 
-                                <div className="flex gap-4">
-                                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center">
-                                        <GraduationCap className="text-blue-500 mb-2" size={20} />
-                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center">Serçev MTAL</span>
+                                <div className="flex gap-3">
+                                    <div className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-950 border border-white/[0.04] group/card hover:border-emerald-500/20 transition-colors duration-300">
+                                        <GraduationCap className="text-emerald-400" size={18} />
+                                        <span className="text-[9px] text-slate-600 font-black uppercase tracking-[0.15em] text-center">Serçev MTAL</span>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center">
-                                        <Code2 className="text-indigo-500 mb-2" size={20} />
-                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center">Full-Stack Dev</span>
+                                    <div className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-slate-950 border border-white/[0.04] hover:border-cyan-500/20 transition-colors duration-300">
+                                        <Code2 className="text-cyan-400" size={18} />
+                                        <span className="text-[9px] text-slate-600 font-black uppercase tracking-[0.15em] text-center">Full-Stack Dev</span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Sağ taraf: Fotoğraf ve efektler */}
+                            {/* Right: Photo */}
                             <div className="hidden md:flex justify-center">
                                 <div className="relative group/photo">
+                                    {/* Glow */}
+                                    <motion.div
+                                        animate={{ opacity: [0.15, 0.25, 0.15] }}
+                                        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                                        className="absolute inset-0 bg-emerald-500 rounded-3xl rotate-6 blur-2xl"
+                                    />
 
-                                    {/* Arka glow */}
-                                    <div className="absolute inset-0 bg-blue-600 rounded-[3rem] rotate-6 blur-2xl opacity-20 group-hover/photo:opacity-40 transition-opacity duration-500" />
-
-                                    {/* Fotoğraf çerçevesi */}
-                                    <div className="w-64 h-64 bg-slate-800 rounded-[3rem] rotate-6 flex items-center justify-center relative overflow-hidden border-4 border-white/10 group-hover/photo:rotate-3 transition-transform duration-500 shadow-2xl">
+                                    {/* Photo frame */}
+                                    <div className="w-56 h-56 bg-[#060b13] rounded-3xl rotate-3 flex items-center justify-center relative overflow-hidden border border-white/5 group-hover/photo:rotate-0 transition-transform duration-700 shadow-2xl">
                                         <img
                                             src="/umut-can-salman.jpg"
                                             alt="Umut Can Salman"
-                                            className="w-full h-full object-cover -rotate-6 scale-110 group-hover/photo:scale-100 transition-transform duration-500"
+                                            className="w-full h-full object-cover -rotate-3 scale-110 group-hover/photo:scale-100 group-hover/photo:rotate-0 transition-transform duration-700"
                                             onError={(e) => {
-                                                e.currentTarget.src = "https://ui-avatars.com/api/?name=Umut+Can+Salman&background=020617&color=3b82f6&size=512";
+                                                e.currentTarget.src = "https://ui-avatars.com/api/?name=Umut+Can+Salman&background=030712&color=10b981&size=512";
                                             }}
                                         />
-
-                                        {/* Overlay gradyan */}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 to-transparent opacity-60" />
-
-                                        {/* Dönen kesikli çerçeve */}
-                                        <div className="absolute inset-2 border border-white/20 rounded-[2.5rem] border-dashed animate-[spin_15s_linear_infinite] pointer-events-none" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/30 to-transparent opacity-60" />
+                                        {/* Spinning border */}
+                                        <div className="absolute inset-2 border border-emerald-500/10 rounded-2xl border-dashed animate-[spin_20s_linear_infinite] pointer-events-none" />
                                     </div>
 
-                                    {/* Admin etiketi */}
-                                    <div className="absolute -bottom-4 -right-4 bg-blue-600 text-white text-[8px] font-black px-3 py-1.5 rounded-lg rotate-12 shadow-xl border border-blue-400 animate-bounce">
-                                        ADMIN VERIFIED
+                                    {/* Badge */}
+                                    <div className="absolute -bottom-3 -right-3 bg-emerald-500 text-slate-950 text-[8px] font-black px-3 py-1.5 rounded-lg rotate-6 shadow-xl shadow-emerald-500/30">
+                                        VERIFIED ✓
                                     </div>
                                 </div>
                             </div>
-
                         </div>
+
+                        {/* Bottom bar */}
+                        <div className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-1000 opacity-60" />
                     </div>
                 </motion.section>
 
-
-                {/* --- FOOTER --- */}
-                <footer className="pt-16 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="text-center md:text-left">
-                        <div className="text-[11px] font-black text-white tracking-[0.5em] uppercase mb-3">
-                            © 2025 - 2026 EDU-GAMIFICATION ENGINE
+                {/* ─── FOOTER ─── */}
+                <footer className="pt-8 border-t border-white/[0.04] flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div>
+                        <div className="text-[10px] font-black text-white tracking-[0.4em] uppercase mb-2">
+                            © 2025–2026 EDU-GAMIFICATION ENGINE
                         </div>
-                        <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest leading-loose">
-                            Eğitim Bir Görev Değil, <span className="text-blue-500">Bir Deneyimdir.</span>
+                        <p className="text-[10px] text-slate-700 font-bold uppercase tracking-[0.2em]">
+                            Eğitim Bir Görev Değil,{" "}
+                            <span className="text-emerald-500">Bir Deneyimdir.</span>
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-6 bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
-                        {/* Noktalar Grubu */}
-                        <motion.div
-                            className="flex gap-2"
-                            variants={{
-                                animate: {
-                                    transition: {
-                                        staggerChildren: 0.2 // Noktalar arası 0.2sn gecikme
-                                    }
-                                }
-                            }}
-                            initial="initial"
-                            animate="animate"
-                        >
+                    <div className="flex items-center gap-4 px-5 py-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <div className="flex gap-1.5">
                             {[0, 1, 2].map((i) => (
                                 <motion.div
                                     key={i}
-                                    variants={{
-                                        initial: { opacity: 0.3, scale: 0.8 },
-                                        animate: {
-                                            opacity: [0.3, 1, 0.3],
-                                            scale: [0.8, 1.1, 0.8],
-                                        }
-                                    }}
-                                    transition={{
-                                        duration: 1.5,
-                                        repeat: Infinity,
-                                        ease: "easeInOut"
-                                    }}
-                                    className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]"
+                                    animate={{ opacity: [0.3, 1, 0.3], scale: [1, 1.2, 1] }}
+                                    transition={{ repeat: Infinity, duration: 2, delay: i * 0.4 }}
+                                    className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
                                 />
                             ))}
-                        </motion.div>
-
-                        {/* Metin Alanı */}
-                        <span className="text-[9px] text-slate-400 font-black tracking-[0.3em] uppercase">
-                            System Status: <span className="text-blue-400 animate-pulse">Processing</span>
+                        </div>
+                        <span className="text-[9px] text-slate-600 font-black tracking-[0.25em] uppercase">
+                            System: <span className="text-emerald-500">Optimal</span>
                         </span>
                     </div>
                 </footer>
+
             </div>
         </div>
     );

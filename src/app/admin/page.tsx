@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Lock, User, ShieldAlert, Loader2 } from "lucide-react";
 
 // Cloudflare Worker URL'in
-const API_URL = "https://gamebackend.cansalman332.workers.dev/api/auth";
+const API_URL = "http://localhost:3001/api/auth";
 
 export default function AdminLogin() {
     const [auth, setAuth] = useState({ user: "", pass: "" });

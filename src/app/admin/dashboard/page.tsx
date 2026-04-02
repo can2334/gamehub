@@ -14,7 +14,7 @@ export default function AdminMain() {
     const fetchAllGames = async () => {
         try {
             setLoading(true);
-            const res = await fetch("https://gamebackend.cansalman332.workers.dev/api/games");
+            const res = await fetch("http://localhost:3001/api/games");
             const data = await res.json();
             setGames(data); // Bütün tabloyu state'e basıyoruz
         } catch (err) {
@@ -32,7 +32,7 @@ export default function AdminMain() {
         setUpdatingId(game.id); // Sadece o kartta loading dönsün
 
         try {
-            const res = await fetch("https://gamebackend.cansalman332.workers.dev/api/games", {
+            const res = await fetch("http://localhost:3001/api/games", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

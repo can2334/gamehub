@@ -16,7 +16,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 
-const BACKEND_URL = "https://gamebackend.cansalman332.workers.dev";
+const BACKEND_URL = "http://localhost:3001";
 
 // --- MODERN SİLME ONAY MODALI ---
 const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, questionText }: any) => {
@@ -191,13 +191,13 @@ export default function MultiGameQuestions() {
                                                     <div
                                                         key={key}
                                                         className={`p-4 rounded-2xl border transition-all flex items-center gap-4 ${isCorrect
-                                                                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                                                                : 'bg-black/30 border-slate-800 text-slate-400'
+                                                            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                                                            : 'bg-black/30 border-slate-800 text-slate-400'
                                                             }`}
                                                     >
                                                         <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${isCorrect
-                                                                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40'
-                                                                : 'bg-slate-800 text-slate-500'
+                                                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40'
+                                                            : 'bg-slate-800 text-slate-500'
                                                             }`}>
                                                             {key}
                                                         </span>
