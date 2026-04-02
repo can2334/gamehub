@@ -27,6 +27,7 @@ export default function Header() {
         { label: "Anasayfa", href: "/" },
         { label: "Oyunlar", href: "/games" },
         { label: "Hakkımızda", href: "/about" },
+        { label: "Eğitim", href: "/egitim" },
     ];
 
     return (
@@ -54,7 +55,6 @@ export default function Header() {
                         BILIŞIM<span className="text-emerald-400">_</span>ARENA
                     </span>
                 </Link>
-
                 {/* PC NAV */}
                 <nav className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[0.2em] text-slate-500 uppercase">
                     {menuItems.map((item) => (
@@ -68,7 +68,6 @@ export default function Header() {
                         </Link>
                     ))}
                 </nav>
-
                 {/* PC CTA */}
                 <div className="hidden md:flex items-center gap-4">
                     <Link
@@ -82,7 +81,6 @@ export default function Header() {
                         </span>
                     </Link>
                 </div>
-
                 {/* MOBİL BUTON */}
                 <button
                     onClick={() => setSidebarOpen(true)}
@@ -91,7 +89,6 @@ export default function Header() {
                     <Menu size={20} />
                 </button>
             </motion.header>
-
             {/* MOBİL SIDEBAR */}
             <AnimatePresence>
                 {sidebarOpen && (
@@ -104,7 +101,6 @@ export default function Header() {
                             onClick={() => setSidebarOpen(false)}
                             className="fixed inset-0 bg-[#030712]/95 backdrop-blur-md z-[60] md:hidden"
                         />
-
                         {/* Panel */}
                         <motion.div
                             initial={{ x: "100%" }}
@@ -126,7 +122,6 @@ export default function Header() {
                                     backgroundSize: "40px 40px",
                                 }}
                             />
-
                             <div className="relative z-10 flex flex-col h-full p-6">
                                 {/* Header */}
                                 <div className="flex justify-between items-center mb-12">
@@ -143,7 +138,6 @@ export default function Header() {
                                         <X size={18} />
                                     </button>
                                 </div>
-
                                 {/* Menu items */}
                                 <nav className="flex flex-col gap-2 flex-1">
                                     {menuItems.map((item, i) => (
@@ -166,7 +160,6 @@ export default function Header() {
                                         </motion.div>
                                     ))}
                                 </nav>
-
                                 {/* Bottom CTA */}
                                 <motion.div
                                     initial={{ opacity: 0, y: 20 }}
